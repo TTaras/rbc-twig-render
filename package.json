@@ -1,7 +1,7 @@
 {
-  "name": "rbc-twig-compiler",
+  "name": "rbc-twig-render",
   "version": "0.0.1",
-  "description": "Pre-compiled Twig.js templates",
+  "description": "Render pre-compiled Twig.js templates",
   "keywords": [
     "rbc",
     "template",
@@ -10,14 +10,14 @@
     "twigjs",
     "twig.js"
   ],
-  "homepage": "https://github.com/TTaras/rbc-twig-compiler",
+  "homepage": "https://github.com/TTaras/rbc-twig-render",
   "author": {
     "name": "RBC-frontend"
   },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/TTaras/rbc-twig-compiler.git"
+    "url": "https://github.com/TTaras/rbc-twig-renderr.git"
   },
   "dependencies": {},
   "devDependencies": {},
