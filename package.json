@@ -1,6 +1,6 @@
 {
   "name": "rbc-twig-render",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Render pre-compiled Twigjs templates",
   "keywords": [
     "rbc",
@@ -19,9 +19,7 @@
     "url": "https://github.com/TTaras/rbc-twig-renderr.git"
   },
   "dependencies": {
-    "minimatch": "3.0.x",
-    "locutus": "^2.0.5",
-    "walk": "2.3.x"
+    "locutus": "^2.0.5"
   },
   "devDependencies": {},
   "engines": {
