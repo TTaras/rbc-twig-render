@@ -7,7 +7,7 @@
  */
 
 var Twig = {
-    VERSION: '0.0.3',
+    VERSION: '0.0.4',
     _is: function (type, obj) {
         var clas = Object.prototype.toString.call(obj).slice(8, -1);
         return obj !== undefined && obj !== null && clas === type;
@@ -27,48 +27,6 @@ var Twig = {
     Twig.placeholders = {
         parent: "{{|PARENT|}}"
     };
-
-    /**
-     * Fallback for Array.indexOf for IE8 et al
-     */
-    Twig.indexOf = function (arr, searchElement /*, fromIndex */) {
-        if (Array.prototype.hasOwnProperty("indexOf")) {
-            return arr.indexOf(searchElement);
-        }
-        if (arr === void 0 || arr === null) {
-            throw new TypeError();
-        }
-        var t = Object(arr);
-        var len = t.length >>> 0;
-        if (len === 0) {
-            return -1;
-        }
-        var n = 0;
-        if (arguments.length > 0) {
-            n = Number(arguments[1]);
-            if (n !== n) { // shortcut for verifying if it's NaN
-                n = 0;
-            } else if (n !== 0 && n !== Infinity && n !== -Infinity) {
-                n = (n > 0 || -1) * Math.floor(Math.abs(n));
-            }
-        }
-        if (n >= len) {
-            // console.log("indexOf not found1 ", JSON.stringify(searchElement), JSON.stringify(arr));
-            return -1;
-        }
-        var k = n >= 0 ? n : Math.max(len - Math.abs(n), 0);
-        for (; k < len; k++) {
-            if (k in t && t[k] === searchElement) {
-                return k;
-            }
-        }
-        if (arr == searchElement) {
-            return 0;
-        }
-        // console.log("indexOf not found2 ", JSON.stringify(searchElement), JSON.stringify(arr));
-
-        return -1;
-    }
 
     Twig.forEach = function (arr, callback, thisArg) {
         if (Array.prototype.forEach) {
@@ -783,14 +741,14 @@ var Twig = {
                     };
 
 
-                if (Twig.lib.is('Array', result)) {
+                if (Twig._is('Array', result)) {
                     len = result.length;
                     Twig.forEach(result, function (value) {
                         var key = index;
 
                         loop(key, value);
                     });
-                } else if (Twig.lib.is('Object', result)) {
+                } else if (Twig._is('Object', result)) {
                     if (result._keys !== undefined) {
                         keyset = result._keys;
                     } else {
@@ -920,8 +878,8 @@ var Twig = {
             parse: function (token, context, chain) {
                 var block_output,
                     output,
-                    isImported = Twig.indexOf(this.importedBlocks, token.block) > -1,
-                    hasParent = this.blocks[token.block] && Twig.indexOf(this.blocks[token.block], Twig.placeholders.parent) > -1;
+                    isImported = this.importedBlocks.indexOf(token.block) > -1,
+                    hasParent = this.blocks[token.block] && this.blocks[token.block].indexOf(Twig.placeholders.parent) > -1;
 
                 // Don't override previous blocks unless they're imported with "use"
                 // Loops should be exempted as well.
@@ -1228,7 +1186,6 @@ var Twig = {
      * @param {Object} definition The new logic expression.
      */
     Twig.logic.extend = function (definition) {
-
         if (!definition.type) {
             throw new Twig.Error("Unable to extend logic definition. No type provided for " + definition);
         } else {
@@ -2131,41 +2088,18 @@ var Twig = {
 (function (Twig) {
 
     Twig.filters = {
-        // String Filters
         upper: function(value) {
-            if (typeof value !== "string") {
-                return value;
-            }
-
+            if (typeof value !== "string") return value;
             return value.toUpperCase();
         },
         lower: function(value) {
-            if (typeof value !== "string") {
-                return value;
-            }
-
+            if (typeof value !== "string")  return value;
             return value.toLowerCase();
         },
-        capitalize: function(value) {
-            if (typeof value !== "string") {
-                return value;
-            }
-
-            return value.substr(0, 1).toUpperCase() + value.toLowerCase().substr(1);
-        },
-        title: function(value) {
-            if (typeof value !== "string") {
-                return value;
-            }
-
-            return value.toLowerCase().replace(/(^|\s)([a-z])/g, function (m, p1, p2) {
-                return p1 + p2.toUpperCase();
-            });
-        },
         length: function(value) {
-            if (Twig.lib.is("Array", value) || typeof value === "string") {
+            if (Twig._is("Array", value) || typeof value === "string") {
                 return value.length;
-            } else if (Twig.lib.is("Object", value)) {
+            } else if (Twig._is("Object", value)) {
                 if (value._keys === undefined) {
                     return Object.keys(value).length;
                 } else {
@@ -2175,8 +2109,6 @@ var Twig = {
                 return 0;
             }
         },
-
-        // Array/Object Filters
         reverse: function(value) {
             if (Twig._is("Array", value)) {
                 return value.reverse();
@@ -2188,84 +2120,31 @@ var Twig = {
                 return value;
             }
         },
-        sort: function(value) {
-            if (Twig._is("Array", value)) {
-                return value.sort();
-            } else if (Twig._is('Object', value)) {
-                // Sorting objects isn't obvious since the order of
-                // returned keys isn't guaranteed in JavaScript.
-                // Because of this we use a "hidden" key called _keys to
-                // store the keys in the order we want to return them.
-
-                delete value._keys;
-                var keys = Object.keys(value),
-                    sorted_keys = keys.sort(function (a, b) {
-                        var a1, a2;
-
-                        // if a and b are comparable, we're fine :-)
-                        if ((value[a] > value[b]) == !(value[a] <= value[b])) {
-                            return value[a] > value[b] ? 1 :
-                                value[a] < value[b] ? -1 :
-                                    0;
-                        }
-                        // if a and b can be parsed as numbers, we can compare
-                        // their numeric value
-                        else if (!isNaN(a1 = parseFloat(value[a])) && !isNaN(b1 = parseFloat(value[b]))) {
-                            return a1 > b1 ? 1 :
-                                a1 < b1 ? -1 :
-                                    0;
-                        }
-                        // if one of the values is a string, we convert the
-                        // other value to string as well
-                        else if (typeof value[a] == 'string') {
-                            return value[a] > value[b].toString() ? 1 :
-                                value[a] < value[b].toString() ? -1 :
-                                    0;
-                        }
-                        else if (typeof value[b] == 'string') {
-                            return value[a].toString() > value[b] ? 1 :
-                                value[a].toString() < value[b] ? -1 :
-                                    0;
-                        }
-                        // everything failed - return 'null' as sign, that
-                        // the values are not comparable
-                        else {
-                            return null;
-                        }
-                    });
-                value._keys = sorted_keys;
-                return value;
-            }
-        },
         keys: function(value) {
-            if (value === undefined || value === null) {
-                return;
-            }
+            if (value === undefined || value === null) return;
 
-            var keyset = value._keys || Object.keys(value),
-                output = [];
+            var keyset = value._keys || Object.keys(value)
+            var output = [];
 
-            Twig.forEach(keyset, function (key) {
+            Twig.forEach(keyset, function(key) {
                 if (key === "_keys") return; // Ignore the _keys property
                 if (value.hasOwnProperty(key)) {
                     output.push(key);
                 }
             });
+
             return output;
         },
         url_encode: function(value) {
-            if (value === undefined || value === null) {
-                return;
-            }
+            if (value === undefined || value === null) return;
 
             var result = encodeURIComponent(value);
             result = result.replace("'", "%27");
+
             return result;
         },
-        join: function(value, params) {
-            if (value === undefined || value === null) {
-                return;
-            }
+        join: function(value, params) { // !!!!!!!!!!!!!!!!!! remove afret relise 8
+            if (value === undefined || value === null) return;
 
             var join_str = "",
                 output = [],
@@ -2274,201 +2153,82 @@ var Twig = {
             if (params && params[0]) {
                 join_str = params[0];
             }
+
             if (Twig._is("Array", value)) {
                 output = value;
             } else {
                 keyset = value._keys || Object.keys(value);
-                Twig.forEach(keyset, function (key) {
+                Twig.forEach(keyset, function(key) {
                     if (key === "_keys") return; // Ignore the _keys property
                     if (value.hasOwnProperty(key)) {
                         output.push(value[key]);
                     }
                 });
             }
+
             return output.join(join_str);
         },
         "default": function(value, params) {
             if (params !== undefined && params.length > 1) {
                 throw new Twig.Error("default filter expects one argument");
             }
-            if (value === undefined || value === null || value === '') {
-                if (params === undefined) {
-                    return '';
-                }
 
+            if (value === undefined || value === null || value === '') {
+                if (params === undefined) return '';
                 return params[0];
             } else {
                 return value;
             }
-        },
-        json_encode: function(value) {
-            if (value === undefined || value === null) {
-                return "null";
-            }
-            else if ((typeof value == 'object') && (Twig._is("Array", value))) {
-                output = [];
-
-                Twig.forEach(value, function (v) {
-                    output.push(Twig.filters.json_encode(v));
-                });
-
-                return "[" + output.join(",") + "]";
-            }
-            else if (typeof value == 'object') {
-                var keyset = value._keys || Object.keys(value),
-                    output = [];
-
-                Twig.forEach(keyset, function (key) {
-                    output.push(JSON.stringify(key) + ":" + Twig.filters.json_encode(value[key]));
-                });
-
-                return "{" + output.join(",") + "}";
-            }
-            else {
-                return JSON.stringify(value);
-            }
-        },
-        merge: function(value, params) {
-            var obj = [],
-                arr_index = 0,
-                keyset = [];
-
-            // Check to see if all the objects being merged are arrays
-            if (!Twig._is("Array", value)) {
-                // Create obj as an Object
-                obj = {};
-            } else {
-                Twig.forEach(params, function (param) {
-                    if (!Twig._is("Array", param)) {
-                        obj = {};
-                    }
-                });
-            }
-            if (!Twig._is("Array", obj)) {
-                obj._keys = [];
-            }
-
-            if (Twig._is("Array", value)) {
-                Twig.forEach(value, function (val) {
-                    if (obj._keys) obj._keys.push(arr_index);
-                    obj[arr_index] = val;
-                    arr_index++;
-                });
-            } else {
-                keyset = value._keys || Object.keys(value);
-                Twig.forEach(keyset, function (key) {
-                    obj[key] = value[key];
-                    obj._keys.push(key);
-
-                    // Handle edge case where a number index in an object is greater than
-                    //   the array counter. In such a case, the array counter is increased
-                    //   one past the index.
-                    //
-                    // Example {{ ["a", "b"]|merge({"4":"value"}, ["c", "d"])
-                    // Without this, d would have an index of "4" and overwrite the value
-                    //   of "value"
-                    var int_key = parseInt(key, 10);
-                    if (!isNaN(int_key) && int_key >= arr_index) {
-                        arr_index = int_key + 1;
-                    }
-                });
-            }
-
-            // mixin the merge arrays
-            Twig.forEach(params, function (param) {
-                if (Twig._is("Array", param)) {
-                    Twig.forEach(param, function (val) {
-                        if (obj._keys) obj._keys.push(arr_index);
-                        obj[arr_index] = val;
-                        arr_index++;
-                    });
-                } else {
-                    keyset = param._keys || Object.keys(param);
-                    Twig.forEach(keyset, function (key) {
-                        if (!obj[key]) obj._keys.push(key);
-                        obj[key] = param[key];
-
-                        var int_key = parseInt(key, 10);
-                        if (!isNaN(int_key) && int_key >= arr_index) {
-                            arr_index = int_key + 1;
-                        }
-                    });
-                }
-            });
-            if (params.length === 0) {
-                throw new Twig.Error("Filter merge expects at least one parameter");
-            }
-
-            return obj;
         },
         date: function(value, params) {
             var date = Twig.functions.date(value);
             var format = params && params.length ? params[0] : 'F j, Y H:i';
             return Twig.lib.date(format, date);
         },
-
         date_modify: function(value, params) {
-            if (value === undefined || value === null) {
-                return;
-            }
+            if (value === undefined || value === null) return;
+
             if (params === undefined || params.length !== 1) {
                 throw new Twig.Error("date_modify filter expects 1 argument");
             }
 
             var modifyText = params[0], time;
 
-            if (Twig.lib.is("Date", value)) {
+            if (Twig._is("Date", value)) {
                 time = Twig.lib.strtotime(modifyText, value.getTime() / 1000);
             }
-            if (Twig.lib.is("String", value)) {
+            if (Twig._is("String", value)) {
                 time = Twig.lib.strtotime(modifyText, Twig.lib.strtotime(value));
             }
-            if (Twig.lib.is("Number", value)) {
+            if (Twig._is("Number", value)) {
                 time = Twig.lib.strtotime(modifyText, value);
             }
 
             return new Date(time * 1000);
         },
-
         replace: function(value, params) {
-            if (value === undefined || value === null) {
-                return;
-            }
+            if (value === undefined || value === null) return;
 
-            var pairs = params[0],
-                tag;
+            var pairs = params[0];
+            var tag;
+
             for (tag in pairs) {
                 if (pairs.hasOwnProperty(tag) && tag !== "_keys") {
                     value = Twig.lib.replaceAll(value, tag, pairs[tag]);
                 }
             }
+
             return value;
         },
-
-        format: function(value, params) {
-            if (value === undefined || value === null) {
-                return;
-            }
-
-            return Twig.lib.vsprintf(value, params);
-        },
-
         striptags: function(value) {
-            if (value === undefined || value === null) {
-                return;
-            }
-
+            if (value === undefined || value === null) return;
             return Twig.lib.strip_tags(value);
         },
-
         escape: function(value, params) {
-            if (value === undefined || value === null) {
-                return;
-            }
+            if (value === undefined || value === null) return;
 
             var strategy = "html";
-            if (params && params.length && params[0] !== true)
-                strategy = params[0];
+            if (params && params.length && params[0] !== true) strategy = params[0];
 
             if (strategy == "html") {
                 var raw_value = value.toString().replace(/&/g, "&amp;")
@@ -2477,38 +2237,6 @@ var Twig = {
                     .replace(/"/g, "&quot;")
                     .replace(/'/g, "&#039;");
                 return Twig.Markup(raw_value, 'html');
-            } else if (strategy == "js") {
-                var raw_value = value.toString();
-                var result = "";
-
-                for (var i = 0; i < raw_value.length; i++) {
-                    if (raw_value[i].match(/^[a-zA-Z0-9,\._]$/))
-                        result += raw_value[i];
-                    else {
-                        var char_code = raw_value.charCodeAt(i);
-
-                        if (char_code < 0x80)
-                            result += "\\x" + char_code.toString(16).toUpperCase();
-                        else
-                            result += Twig.lib.sprintf("\\u%04s", char_code.toString(16).toUpperCase());
-                    }
-                }
-
-                return Twig.Markup(result, 'js');
-            } else if (strategy == "css") {
-                var raw_value = value.toString();
-                var result = "";
-
-                for (var i = 0; i < raw_value.length; i++) {
-                    if (raw_value[i].match(/^[a-zA-Z0-9]$/))
-                        result += raw_value[i];
-                    else {
-                        var char_code = raw_value.charCodeAt(i);
-                        result += "\\" + char_code.toString(16).toUpperCase() + " ";
-                    }
-                }
-
-                return Twig.Markup(result, 'css');
             } else if (strategy == "url") {
                 var result = Twig.filters.url_encode(value);
                 return Twig.Markup(result, 'url');
@@ -2524,52 +2252,16 @@ var Twig = {
                             .replace(/</g, "&lt;")
                             .replace(/>/g, "&gt;")
                             .replace(/"/g, "&quot;");
-                    else {
-                        var char_code = raw_value.charCodeAt(i);
-
-                        // The following replaces characters undefined in HTML with
-                        // the hex entity for the Unicode replacement character.
-                        if (char_code <= 0x1f && char_code != 0x09 && char_code != 0x0a && char_code != 0x0d)
-                            result += "&#xFFFD;";
-                        else if (char_code < 0x80)
-                            result += Twig.lib.sprintf("&#x%02s;", char_code.toString(16).toUpperCase());
-                        else
-                            result += Twig.lib.sprintf("&#x%04s;", char_code.toString(16).toUpperCase());
-                    }
                 }
-
                 return Twig.Markup(result, 'html_attr');
             } else {
                 throw new Twig.Error("escape strategy unsupported");
             }
         },
-
-        /* Alias of escape */
         "e": function (value, params) {
             return Twig.filters.escape(value, params);
         },
-
-        nl2br: function(value) {
-            if (value === undefined || value === null) {
-                return;
-            }
-            var linebreak_tag = "BACKSLASH_n_replace",
-                br = "<br />" + linebreak_tag;
-
-            value = Twig.filters.escape(value)
-                .replace(/\r\n/g, br)
-                .replace(/\r/g, br)
-                .replace(/\n/g, br);
-
-            value = Twig.lib.replaceAll(value, linebreak_tag, "\n");
-
-            return Twig.Markup(value);
-        },
-
-        /**
-         * Adapted from: http://phpjs.org/functions/number_format:481
-         */
-        number_format: function(value, params) {
+        number_format: function(value, params) { // !!!!!!!!!!!  remove afret relise 8
             var number = value,
                 decimals = (params && params[0]) ? params[0] : undefined,
                 dec = (params && params[1] !== undefined) ? params[1] : ".",
@@ -2592,73 +2284,38 @@ var Twig = {
                 s[1] = s[1] || '';
                 s[1] += new Array(prec - s[1].length + 1).join('0');
             }
+
             return s.join(dec);
         },
-
         trim: function (value, params) {
-            if (value === undefined || value === null) {
-                return;
-            }
+            if (value === undefined || value === null) return;
 
-            var str = Twig.filters.escape('' + value),
-                whitespace;
+            var str = Twig.filters.escape('' + value), whitespace;
+
             if (params && params[0]) {
                 whitespace = '' + params[0];
             } else {
                 whitespace = ' \n\r\t\f\x0b\xa0\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u200b\u2028\u2029\u3000';
             }
+
             for (var i = 0; i < str.length; i++) {
                 if (whitespace.indexOf(str.charAt(i)) === -1) {
                     str = str.substring(i);
                     break;
                 }
             }
+
             for (i = str.length - 1; i >= 0; i--) {
                 if (whitespace.indexOf(str.charAt(i)) === -1) {
                     str = str.substring(0, i + 1);
                     break;
                 }
             }
+
             return whitespace.indexOf(str.charAt(0)) === -1 ? str : '';
         },
-
-        truncate: function (value, params) {
-            var length = 30,
-                preserve = false,
-                separator = '...';
-
-            value = value + '';
-            if (params) {
-                if (params[0]) {
-                    length = params[0];
-                }
-                if (params[1]) {
-                    preserve = params[1];
-                }
-                if (params[2]) {
-                    separator = params[2];
-                }
-            }
-
-            if (value.length > length) {
-
-                if (preserve) {
-                    length = value.indexOf(' ', length);
-                    if (length === -1) {
-                        return value;
-                    }
-                }
-
-                value = value.substr(0, length) + separator;
-            }
-
-            return value;
-        },
-
         slice: function (value, params) {
-            if (value === undefined || value === null) {
-                return;
-            }
+            if (value === undefined || value === null) return;
             if (params === undefined || params.length < 1) {
                 throw new Twig.Error("slice filter expects at least 1 argument");
             }
@@ -2670,109 +2327,37 @@ var Twig = {
             // handle negative start values
             var startIndex = start >= 0 ? start : Math.max(value.length + start, 0);
 
-            if (Twig.lib.is("Array", value)) {
+            if (Twig._is("Array", value)) {
                 var output = [];
                 for (var i = startIndex; i < startIndex + length && i < value.length; i++) {
                     output.push(value[i]);
                 }
                 return output;
-            } else if (Twig.lib.is("String", value)) {
+            } else if (Twig._is("String", value)) {
                 return value.substr(startIndex, length);
             } else {
                 throw new Twig.Error("slice filter expects value to be an array or string");
             }
         },
-
         abs: function (value) {
-            if (value === undefined || value === null) {
-                return;
-            }
-
+            if (value === undefined || value === null) return;
             return Math.abs(value);
         },
-
         first: function (value) {
             if (Twig._is("Array", value)) {
                 return value[0];
             } else if (Twig._is("Object", value)) {
-                if ('_keys' in value) {
-                    return value[value._keys[0]];
-                }
+                var keys = value._keys || Object.keys(value);
+                return value[keys[0]];
             } else if (typeof value === "string") {
                 return value.substr(0, 1);
             }
 
             return;
         },
-
-        split: function (value, params) {
-            if (value === undefined || value === null) {
-                return;
-            }
-            if (params === undefined || params.length < 1 || params.length > 2) {
-                throw new Twig.Error("split filter expects 1 or 2 argument");
-            }
-            if (Twig.lib.is("String", value)) {
-                var delimiter = params[0],
-                    limit = params[1],
-                    split = value.split(delimiter);
-
-                if (limit === undefined) {
-
-                    return split;
-
-                } else if (limit < 0) {
-
-                    return value.split(delimiter, split.length + limit);
-
-                } else {
-
-                    var limitedSplit = [];
-
-                    if (delimiter == '') {
-                        // empty delimiter
-                        // "aabbcc"|split('', 2)
-                        //     -> ['aa', 'bb', 'cc']
-
-                        while (split.length > 0) {
-                            var temp = "";
-                            for (var i = 0; i < limit && split.length > 0; i++) {
-                                temp += split.shift();
-                            }
-                            limitedSplit.push(temp);
-                        }
-
-                    } else {
-                        // non-empty delimiter
-                        // "one,two,three,four,five"|split(',', 3)
-                        //     -> ['one', 'two', 'three,four,five']
-
-                        for (var i = 0; i < limit - 1 && split.length > 0; i++) {
-                            limitedSplit.push(split.shift());
-                        }
-
-                        if (split.length > 0) {
-                            limitedSplit.push(split.join(delimiter));
-                        }
-                    }
-
-                    return limitedSplit;
-                }
-
-            } else {
-                throw new Twig.Error("split filter expects value to be a string");
-            }
-        },
         last: function (value) {
-            if (Twig.lib.is('Object', value)) {
-                var keys;
-
-                if (value._keys === undefined) {
-                    keys = Object.keys(value);
-                } else {
-                    keys = value._keys;
-                }
-
+            if (Twig._is('Object', value)) {
+                var keys = value._keys || Object.keys(value);
                 return value[keys[keys.length - 1]];
             }
 
@@ -2782,38 +2367,6 @@ var Twig = {
         raw: function (value) {
             return Twig.Markup(value);
         },
-        batch: function (items, params) {
-            var size = params.shift(),
-                fill = params.shift(),
-                result,
-                last,
-                missing;
-
-            if (!Twig.lib.is("Array", items)) {
-                throw new Twig.Error("batch filter expects items to be an array");
-            }
-
-            if (!Twig.lib.is("Number", size)) {
-                throw new Twig.Error("batch filter expects size to be a number");
-            }
-
-            size = Math.ceil(size);
-
-            result = Twig.lib.chunkArray(items, size);
-
-            if (fill && items.length % size != 0) {
-                last = result.pop();
-                missing = size - last.length;
-
-                while (missing--) {
-                    last.push(fill);
-                }
-
-                result.push(last);
-            }
-
-            return result;
-        },
         round: function (value, params) {
             params = params || [];
 
@@ -2822,15 +2375,13 @@ var Twig = {
 
             value = parseFloat(value);
 
-            if (precision && !Twig.lib.is("Number", precision)) {
+            if (precision && !Twig._is("Number", precision)) {
                 throw new Twig.Error("round filter expects precision to be a number");
             }
-
             if (method === "common") {
                 return Twig.lib.round(value, precision);
             }
-
-            if (!Twig.lib.is("Function", Math[method])) {
+            if (!Twig._is("Function", Math[method])) {
                 throw new Twig.Error("round filter expects method to be 'floor', 'ceil', or 'common'");
             }
 
@@ -2860,10 +2411,6 @@ var Twig = {
 (function (Twig) {
 
     Twig.functions = {
-        //  attribute, block, constant, date, dump, parent, random,.
-
-        // Range function from http://phpjs.org/functions/range:499
-        // Used under an MIT License
         range: function (low, high, step) {
             // http://kevin.vanzonneveld.net
             // +   original by: Waldo Malqui Silva
@@ -2907,132 +2454,30 @@ var Twig = {
 
             return matrix;
         },
-        cycle: function (arr, i) {
-            var pos = i % arr.length;
-            return arr[pos];
-        },
-        dump: function () {
-            var EOL = '\n',
-                indentChar = '  ',
-                indentTimes = 0,
-                out = '',
-                args = Array.prototype.slice.call(arguments),
-                indent = function (times) {
-                    var ind = '';
-                    while (times > 0) {
-                        times--;
-                        ind += indentChar;
-                    }
-                    return ind;
-                },
-                displayVar = function (variable) {
-                    out += indent(indentTimes);
-                    if (typeof(variable) === 'object') {
-                        dumpVar(variable);
-                    } else if (typeof(variable) === 'function') {
-                        out += 'function()' + EOL;
-                    } else if (typeof(variable) === 'string') {
-                        out += 'string(' + variable.length + ') "' + variable + '"' + EOL;
-                    } else if (typeof(variable) === 'number') {
-                        out += 'number(' + variable + ')' + EOL;
-                    } else if (typeof(variable) === 'boolean') {
-                        out += 'bool(' + variable + ')' + EOL;
-                    }
-                },
-                dumpVar = function (variable) {
-                    var i;
-                    if (variable === null) {
-                        out += 'NULL' + EOL;
-                    } else if (variable === undefined) {
-                        out += 'undefined' + EOL;
-                    } else if (typeof variable === 'object') {
-                        out += indent(indentTimes) + typeof(variable);
-                        indentTimes++;
-                        out += '(' + (function (obj) {
-                                var size = 0, key;
-                                for (key in obj) {
-                                    if (obj.hasOwnProperty(key)) {
-                                        size++;
-                                    }
-                                }
-                                return size;
-                            })(variable) + ') {' + EOL;
-                        for (i in variable) {
-                            out += indent(indentTimes) + '[' + i + ']=> ' + EOL;
-                            displayVar(variable[i]);
-                        }
-                        indentTimes--;
-                        out += indent(indentTimes) + '}' + EOL;
-                    } else {
-                        displayVar(variable);
-                    }
-                };
-
-            // handle no argument case by dumping the entire render context
-            if (args.length == 0) args.push(this.context);
-
-            Twig.forEach(args, function (variable) {
-                dumpVar(variable);
-            });
-
-            return out;
-        },
-        date: function (date, time) {
+        date: function (date) {
             var dateObj;
+            var lib = Twig.lib;
+            var is = Twig._is;
+
             if (date === undefined || date === null || date === "") {
                 dateObj = new Date();
-            } else if (Twig.lib.is("Date", date)) {
+            } else if (is("Date", date)) {
                 dateObj = date;
-            } else if (Twig.lib.is("String", date)) {
+            } else if (is("String", date)) {
                 if (date.match(/^[0-9]+$/)) {
                     dateObj = new Date(date * 1000);
                 }
                 else {
-                    dateObj = new Date(Twig.lib.strtotime(date) * 1000);
+                    dateObj = new Date(lib.strtotime(date) * 1000);
                 }
-            } else if (Twig.lib.is("Number", date)) {
+            } else if (is("Number", date)) {
                 // timestamp
                 dateObj = new Date(date * 1000);
             } else {
                 throw new Twig.Error("Unable to parse date " + date);
             }
+
             return dateObj;
-        },
-        block: function (block) {
-            if (this.originalBlockTokens[block]) {
-                return Twig.logic.parse.apply(this, [this.originalBlockTokens[block], this.context]).output;
-            } else {
-                return this.blocks[block];
-            }
-        },
-        parent: function () {
-            // Add a placeholder
-            return Twig.placeholders.parent;
-        },
-        max: function (values) {
-            if (Twig.lib.is("Object", values)) {
-                delete values["_keys"];
-                return Twig.lib.max(values);
-            }
-
-            return Twig.lib.max.apply(null, arguments);
-        },
-        min: function (values) {
-            if (Twig.lib.is("Object", values)) {
-                delete values["_keys"];
-                return Twig.lib.min(values);
-            }
-
-            return Twig.lib.min.apply(null, arguments);
-        },
-        template_from_string: function (template) {
-            if (template === undefined) {
-                template = '';
-            }
-            return Twig.Templates.parsers.twig({
-                options: this.options,
-                data: template
-            });
         },
         random: function (value) {
             var LIMIT_INT31 = 0x80000000;
@@ -3040,24 +2485,24 @@ var Twig = {
             function getRandomNumber(n) {
                 var random = Math.floor(Math.random() * LIMIT_INT31);
                 var limits = [0, n];
-                var min = Math.min.apply(null, limits),
-                    max = Math.max.apply(null, limits);
+                var min = Math.min.apply(null, limits), max = Math.max.apply(null, limits);
+
                 return min + Math.floor((max - min + 1) * random / LIMIT_INT31);
             }
 
-            if (Twig.lib.is("Number", value)) {
+            if (Twig._is("Number", value)) {
                 return getRandomNumber(value);
             }
 
-            if (Twig.lib.is("String", value)) {
+            if (Twig._is("String", value)) {
                 return value.charAt(getRandomNumber(value.length - 1));
             }
 
-            if (Twig.lib.is("Array", value)) {
+            if (Twig._is("Array", value)) {
                 return value[getRandomNumber(value.length - 1)];
             }
 
-            if (Twig.lib.is("Object", value)) {
+            if (Twig._is("Object", value)) {
                 var keys = Object.keys(value);
                 return value[keys[getRandomNumber(keys.length - 1)]];
             }
@@ -3090,18 +2535,36 @@ var Twig = {
 // LICENSES.md file.
 //
 (function (Twig) {
-    // Namespace for libraries
     Twig.lib = {};
+    Twig.lib.round = function (value, precision) {
+        var m, f, isHalf, sgn; // helper variables
 
-    Twig.lib.sprintf = require('locutus/php/strings/sprintf');
-    Twig.lib.vsprintf = require('locutus/php/strings/vsprintf');
-    Twig.lib.round = require('locutus/php/math/round');
-    Twig.lib.max = require('locutus/php/math/max');
-    Twig.lib.min = require('locutus/php/math/min');
-    Twig.lib.strip_tags = require('locutus/php/strings/strip_tags');
-    Twig.lib.strtotime = require('locutus/php/datetime/strtotime');
-    Twig.lib.date = require('locutus/php/datetime/date');
+        // making sure precision is integer
+        precision |= 0;
+        m = Math.pow(10, precision);
+        value *= m;
 
+        // sign of the number
+        sgn = value > 0 | -(value < 0);
+        isHalf = value % 1 === 0.5 * sgn;
+        f = Math.floor(value);
+
+        if (isHalf) {
+            value = f + (sgn > 0);
+        }
+
+        return (isHalf ? value : Math.round(value)) / m;
+    };
+    Twig.lib.strip_tags = function strip_tags(input, allowed) {
+        allowed = (((allowed || '') + '').toLowerCase().match(/<[a-z][a-z0-9]*>/g) || []).join('');
+
+        var tags = /<\/?([a-z][a-z0-9]*)\b[^>]*>/gi;
+        var commentsAndPhpTags = /<!--[\s\S]*?-->|<\?(?:php)?[\s\S]*?\?>/gi;
+
+        return input.replace(commentsAndPhpTags, '').replace(tags, function ($0, $1) {
+            return allowed.indexOf('<' + $1.toLowerCase() + '>') > -1 ? $0 : '';
+        });
+    };
     Twig.lib.boolval = function boolval(mixedVar) {
         'use strict';
 
@@ -3151,10 +2614,6 @@ var Twig = {
 
         return true;
     };
-
-    Twig.lib.is = Twig._is;
-
-    // shallow-copy an object
     Twig.lib.copy = function (src) {
         var target = {},
             key;
@@ -3163,10 +2622,8 @@ var Twig = {
 
         return target;
     };
-
     Twig.lib.extend = function (src, add) {
-        var keys = Object.keys(add),
-            i;
+        var keys = Object.keys(add), i;
 
         i = keys.length;
 
@@ -3176,26 +2633,529 @@ var Twig = {
 
         return src;
     };
-
     Twig.lib.replaceAll = function (string, search, replace) {
         return string.split(search).join(replace);
     };
+    Twig.lib.strtotime = function strtotime(text, now) {
+        //   example 1: strtotime('+1 day', 1129633200)
+        //   returns 1: 1129719600
+        //   example 2: strtotime('+1 week 2 days 4 hours 2 seconds', 1129633200)
+        //   returns 2: 1130425202
+        //   example 3: strtotime('last month', 1129633200)
+        //   returns 3: 1127041200
+        //   example 4: strtotime('2009-05-04 08:30:00 GMT')
+        //   returns 4: 1241425800
+        //   example 5: strtotime('2009-05-04 08:30:00+00')
+        //   returns 5: 1241425800
+        //   example 6: strtotime('2009-05-04 08:30:00+02:00')
+        //   returns 6: 1241418600
+        //   example 7: strtotime('2009-05-04T08:30:00Z')
+        //   returns 7: 1241425800
 
-    // chunk an array (arr) into arrays of (size) items, returns an array of arrays, or an empty array on invalid input
-    Twig.lib.chunkArray = function (arr, size) {
-        var returnVal = [],
-            x = 0,
-            len = arr.length;
+        var parsed;
+        var match;
+        var today;
+        var year;
+        var date;
+        var days;
+        var ranges;
+        var len;
+        var times;
+        var regex;
+        var i;
+        var fail = false;
 
-        if (size < 1 || !Twig.lib.is("Array", arr)) {
-            return [];
+        if (!text) return;
+
+        // Unecessary spaces
+        text = text.replace(/^\s+|\s+$/g, '').replace(/\s{2,}/g, ' ').replace(/[\t\r\n]/g, '').toLowerCase();
+
+        // in contrast to php, js Date.parse function interprets:
+        // dates given as yyyy-mm-dd as in timezone: UTC,
+        // dates with "." or "-" as MDY instead of DMY
+        // dates with two-digit years differently
+        // etc...etc...
+        // ...therefore we manually parse lots of common date formats
+        var pattern = new RegExp(['^(\\d{1,4})', '([\\-\\.\\/:])', '(\\d{1,2})', '([\\-\\.\\/:])', '(\\d{1,4})', '(?:\\s(\\d{1,2}):(\\d{2})?:?(\\d{2})?)?', '(?:\\s([A-Z]+)?)?$'].join(''));
+        match = text.match(pattern);
+
+        if (match && match[2] === match[4]) {
+            if (match[1] > 1901) {
+                switch (match[2]) {
+                    case '-':
+                        // YYYY-M-D
+                        if (match[3] > 12 || match[5] > 31) {
+                            return fail;
+                        }
+                        return new Date(match[1], parseInt(match[3], 10) - 1, match[5], match[6] || 0, match[7] || 0, match[8] || 0, match[9] || 0) / 1000;
+                    case '.':
+                        // YYYY.M.D is not parsed by strtotime()
+                        return fail;
+                    case '/':
+                        // YYYY/M/D
+                        if (match[3] > 12 || match[5] > 31) {
+                            return fail;
+                        }
+                        return new Date(match[1], parseInt(match[3], 10) - 1, match[5], match[6] || 0, match[7] || 0, match[8] || 0, match[9] || 0) / 1000;
+                }
+            } else if (match[5] > 1901) {
+                switch (match[2]) {
+                    case '-':
+                        // D-M-YYYY
+                        if (match[3] > 12 || match[1] > 31) {
+                            return fail;
+                        }
+                        return new Date(match[5], parseInt(match[3], 10) - 1, match[1], match[6] || 0, match[7] || 0, match[8] || 0, match[9] || 0) / 1000;
+                    case '.':
+                        // D.M.YYYY
+                        if (match[3] > 12 || match[1] > 31) {
+                            return fail;
+                        }
+                        return new Date(match[5], parseInt(match[3], 10) - 1, match[1], match[6] || 0, match[7] || 0, match[8] || 0, match[9] || 0) / 1000;
+                    case '/':
+                        // M/D/YYYY
+                        if (match[1] > 12 || match[3] > 31) {
+                            return fail;
+                        }
+                        return new Date(match[5], parseInt(match[1], 10) - 1, match[3], match[6] || 0, match[7] || 0, match[8] || 0, match[9] || 0) / 1000;
+                }
+            } else {
+                switch (match[2]) {
+                    case '-':
+                        // YY-M-D
+                        if (match[3] > 12 || match[5] > 31 || match[1] < 70 && match[1] > 38) {
+                            return fail;
+                        }
+                        year = match[1] >= 0 && match[1] <= 38 ? +match[1] + 2000 : match[1];
+                        return new Date(year, parseInt(match[3], 10) - 1, match[5], match[6] || 0, match[7] || 0, match[8] || 0, match[9] || 0) / 1000;
+                    case '.':
+                        // D.M.YY or H.MM.SS
+                        if (match[5] >= 70) {
+                            // D.M.YY
+                            if (match[3] > 12 || match[1] > 31) {
+                                return fail;
+                            }
+                            return new Date(match[5], parseInt(match[3], 10) - 1, match[1], match[6] || 0, match[7] || 0, match[8] || 0, match[9] || 0) / 1000;
+                        }
+                        if (match[5] < 60 && !match[6]) {
+                            // H.MM.SS
+                            if (match[1] > 23 || match[3] > 59) {
+                                return fail;
+                            }
+                            today = new Date();
+                            return new Date(today.getFullYear(), today.getMonth(), today.getDate(), match[1] || 0, match[3] || 0, match[5] || 0, match[9] || 0) / 1000;
+                        }
+
+                        // invalid format, cannot be parsed
+                        return fail;
+                    case '/':
+                        // M/D/YY
+                        if (match[1] > 12 || match[3] > 31 || match[5] < 70 && match[5] > 38) {
+                            return fail;
+                        }
+                        year = match[5] >= 0 && match[5] <= 38 ? +match[5] + 2000 : match[5];
+                        return new Date(year, parseInt(match[1], 10) - 1, match[3], match[6] || 0, match[7] || 0, match[8] || 0, match[9] || 0) / 1000;
+                    case ':':
+                        // HH:MM:SS
+                        if (match[1] > 23 || match[3] > 59 || match[5] > 59) {
+                            return fail;
+                        }
+                        today = new Date();
+                        return new Date(today.getFullYear(), today.getMonth(), today.getDate(), match[1] || 0, match[3] || 0, match[5] || 0) / 1000;
+                }
+            }
         }
 
-        while (x < len) {
-            returnVal.push(arr.slice(x, x += size));
+        // other formats and "now" should be parsed by Date.parse()
+        if (text === 'now') {
+            return now === null || isNaN(now) ? new Date().getTime() / 1000 | 0 : now | 0;
+        }
+        if (!isNaN(parsed = Date.parse(text))) {
+            return parsed / 1000 | 0;
         }
 
-        return returnVal;
+        // Browsers !== Chrome have problems parsing ISO 8601 date strings, as they do
+        // not accept lower case characters, space, or shortened time zones.
+        // Therefore, fix these problems and try again.
+        // Examples:
+        //   2015-04-15 20:33:59+02
+        //   2015-04-15 20:33:59z
+        //   2015-04-15t20:33:59+02:00
+        pattern = new RegExp(['^([0-9]{4}-[0-9]{2}-[0-9]{2})', '[ t]', '([0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?)', '([\\+-][0-9]{2}(:[0-9]{2})?|z)'].join(''));
+        match = text.match(pattern);
+        if (match) {
+            // @todo: time zone information
+            if (match[4] === 'z') {
+                match[4] = 'Z';
+            } else if (match[4].match(/^([+-][0-9]{2})$/)) {
+                match[4] = match[4] + ':00';
+            }
+
+            if (!isNaN(parsed = Date.parse(match[1] + 'T' + match[2] + match[4]))) {
+                return parsed / 1000 | 0;
+            }
+        }
+
+        date = now ? new Date(now * 1000) : new Date();
+        days = {
+            'sun': 0,
+            'mon': 1,
+            'tue': 2,
+            'wed': 3,
+            'thu': 4,
+            'fri': 5,
+            'sat': 6
+        };
+        ranges = {
+            'yea': 'FullYear',
+            'mon': 'Month',
+            'day': 'Date',
+            'hou': 'Hours',
+            'min': 'Minutes',
+            'sec': 'Seconds'
+        };
+
+        function lastNext(type, range, modifier) {
+            var diff;
+            var day = days[range];
+
+            if (typeof day !== 'undefined') {
+                diff = day - date.getDay();
+
+                if (diff === 0) {
+                    diff = 7 * modifier;
+                } else if (diff > 0 && type === 'last') {
+                    diff -= 7;
+                } else if (diff < 0 && type === 'next') {
+                    diff += 7;
+                }
+
+                date.setDate(date.getDate() + diff);
+            }
+        }
+
+        function process(val) {
+            // @todo: Reconcile this with regex using \s, taking into account
+            // browser issues with split and regexes
+            var splt = val.split(' ');
+            var type = splt[0];
+            var range = splt[1].substring(0, 3);
+            var typeIsNumber = /\d+/.test(type);
+            var ago = splt[2] === 'ago';
+            var num = (type === 'last' ? -1 : 1) * (ago ? -1 : 1);
+
+            if (typeIsNumber) {
+                num *= parseInt(type, 10);
+            }
+
+            if (ranges.hasOwnProperty(range) && !splt[1].match(/^mon(day|\.)?$/i)) {
+                return date['set' + ranges[range]](date['get' + ranges[range]]() + num);
+            }
+
+            if (range === 'wee') {
+                return date.setDate(date.getDate() + num * 7);
+            }
+
+            if (type === 'next' || type === 'last') {
+                lastNext(type, range, num);
+            } else if (!typeIsNumber) {
+                return false;
+            }
+
+            return true;
+        }
+
+        times = '(years?|months?|weeks?|days?|hours?|minutes?|min|seconds?|sec' + '|sunday|sun\\.?|monday|mon\\.?|tuesday|tue\\.?|wednesday|wed\\.?' + '|thursday|thu\\.?|friday|fri\\.?|saturday|sat\\.?)';
+        regex = '([+-]?\\d+\\s' + times + '|' + '(last|next)\\s' + times + ')(\\sago)?';
+
+        match = text.match(new RegExp(regex, 'gi'));
+        if (!match) {
+            return fail;
+        }
+
+        for (i = 0, len = match.length; i < len; i++) {
+            if (!process(match[i])) {
+                return fail;
+            }
+        }
+
+        return date.getTime() / 1000;
+    };
+    Twig.lib.date = function date(format, timestamp) {
+        //   example 1: date('H:m:s \\m \\i\\s \\m\\o\\n\\t\\h', 1062402400)
+        //   returns 1: '07:09:40 m is month'
+        //   example 2: date('F j, Y, g:i a', 1062462400)
+        //   returns 2: 'September 2, 2003, 12:26 am'
+        //   example 3: date('Y W o', 1062462400)
+        //   returns 3: '2003 36 2003'
+        //   example 4: var $x = date('Y m d', (new Date()).getTime() / 1000)
+        //   example 4: $x = $x + ''
+        //   example 4: var $result = $x.length // 2009 01 09
+        //   returns 4: 10
+        //   example 5: date('W', 1104534000)
+        //   returns 5: '52'
+        //   example 6: date('B t', 1104534000)
+        //   returns 6: '999 31'
+        //   example 7: date('W U', 1293750000.82); // 2010-12-31
+        //   returns 7: '52 1293750000'
+        //   example 8: date('W', 1293836400); // 2011-01-01
+        //   returns 8: '52'
+        //   example 9: date('W Y-m-d', 1293974054); // 2011-01-02
+        //   returns 9: '52 2011-01-02'
+        //        test: skip-1 skip-2 skip-5
+
+        var jsdate, f;
+        // Keep this here (works, but for code commented-out below for file size reasons)
+        // var tal= [];
+        var txtWords = ['Sun', 'Mon', 'Tues', 'Wednes', 'Thurs', 'Fri', 'Satur', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        // trailing backslash -> (dropped)
+        // a backslash followed by any character (including backslash) -> the character
+        // empty string -> empty string
+        var formatChr = /\\?(.?)/gi;
+        var formatChrCb = function formatChrCb(t, s) {
+            return f[t] ? f[t]() : s;
+        };
+        var _pad = function _pad(n, c) {
+            n = String(n);
+            while (n.length < c) {
+                n = '0' + n;
+            }
+            return n;
+        };
+        f = {
+            // Day
+            d: function d() {
+                // Day of month w/leading 0; 01..31
+                return _pad(f.j(), 2);
+            },
+            D: function D() {
+                // Shorthand day name; Mon...Sun
+                return f.l().slice(0, 3);
+            },
+            j: function j() {
+                // Day of month; 1..31
+                return jsdate.getDate();
+            },
+            l: function l() {
+                // Full day name; Monday...Sunday
+                return txtWords[f.w()] + 'day';
+            },
+            N: function N() {
+                // ISO-8601 day of week; 1[Mon]..7[Sun]
+                return f.w() || 7;
+            },
+            S: function S() {
+                // Ordinal suffix for day of month; st, nd, rd, th
+                var j = f.j();
+                var i = j % 10;
+                if (i <= 3 && parseInt(j % 100 / 10, 10) === 1) {
+                    i = 0;
+                }
+                return ['st', 'nd', 'rd'][i - 1] || 'th';
+            },
+            w: function w() {
+                // Day of week; 0[Sun]..6[Sat]
+                return jsdate.getDay();
+            },
+            z: function z() {
+                // Day of year; 0..365
+                var a = new Date(f.Y(), f.n() - 1, f.j());
+                var b = new Date(f.Y(), 0, 1);
+                return Math.round((a - b) / 864e5);
+            },
+
+            // Week
+            W: function W() {
+                // ISO-8601 week number
+                var a = new Date(f.Y(), f.n() - 1, f.j() - f.N() + 3);
+                var b = new Date(a.getFullYear(), 0, 4);
+                return _pad(1 + Math.round((a - b) / 864e5 / 7), 2);
+            },
+
+            // Month
+            F: function F() {
+                // Full month name; January...December
+                return txtWords[6 + f.n()];
+            },
+            m: function m() {
+                // Month w/leading 0; 01...12
+                return _pad(f.n(), 2);
+            },
+            M: function M() {
+                // Shorthand month name; Jan...Dec
+                return f.F().slice(0, 3);
+            },
+            n: function n() {
+                // Month; 1...12
+                return jsdate.getMonth() + 1;
+            },
+            t: function t() {
+                // Days in month; 28...31
+                return new Date(f.Y(), f.n(), 0).getDate();
+            },
+
+            // Year
+            L: function L() {
+                // Is leap year?; 0 or 1
+                var j = f.Y();
+                return j % 4 === 0 & j % 100 !== 0 | j % 400 === 0;
+            },
+            o: function o() {
+                // ISO-8601 year
+                var n = f.n();
+                var W = f.W();
+                var Y = f.Y();
+                return Y + (n === 12 && W < 9 ? 1 : n === 1 && W > 9 ? -1 : 0);
+            },
+            Y: function Y() {
+                // Full year; e.g. 1980...2010
+                return jsdate.getFullYear();
+            },
+            y: function y() {
+                // Last two digits of year; 00...99
+                return f.Y().toString().slice(-2);
+            },
+
+            // Time
+            a: function a() {
+                // am or pm
+                return jsdate.getHours() > 11 ? 'pm' : 'am';
+            },
+            A: function A() {
+                // AM or PM
+                return f.a().toUpperCase();
+            },
+            B: function B() {
+                // Swatch Internet time; 000..999
+                var H = jsdate.getUTCHours() * 36e2;
+                // Hours
+                var i = jsdate.getUTCMinutes() * 60;
+                // Minutes
+                // Seconds
+                var s = jsdate.getUTCSeconds();
+                return _pad(Math.floor((H + i + s + 36e2) / 86.4) % 1e3, 3);
+            },
+            g: function g() {
+                // 12-Hours; 1..12
+                return f.G() % 12 || 12;
+            },
+            G: function G() {
+                // 24-Hours; 0..23
+                return jsdate.getHours();
+            },
+            h: function h() {
+                // 12-Hours w/leading 0; 01..12
+                return _pad(f.g(), 2);
+            },
+            H: function H() {
+                // 24-Hours w/leading 0; 00..23
+                return _pad(f.G(), 2);
+            },
+            i: function i() {
+                // Minutes w/leading 0; 00..59
+                return _pad(jsdate.getMinutes(), 2);
+            },
+            s: function s() {
+                // Seconds w/leading 0; 00..59
+                return _pad(jsdate.getSeconds(), 2);
+            },
+            u: function u() {
+                // Microseconds; 000000-999000
+                return _pad(jsdate.getMilliseconds() * 1000, 6);
+            },
+
+            // Timezone
+            e: function e() {
+                // Timezone identifier; e.g. Atlantic/Azores, ...
+                // The following works, but requires inclusion of the very large
+                // timezone_abbreviations_list() function.
+                /*              return that.date_default_timezone_get();
+                 */
+                var msg = 'Not supported (see source code of date() for timezone on how to add support)';
+                throw new Error(msg);
+            },
+            I: function I() {
+                // DST observed?; 0 or 1
+                // Compares Jan 1 minus Jan 1 UTC to Jul 1 minus Jul 1 UTC.
+                // If they are not equal, then DST is observed.
+                var a = new Date(f.Y(), 0);
+                // Jan 1
+                var c = Date.UTC(f.Y(), 0);
+                // Jan 1 UTC
+                var b = new Date(f.Y(), 6);
+                // Jul 1
+                // Jul 1 UTC
+                var d = Date.UTC(f.Y(), 6);
+                return a - c !== b - d ? 1 : 0;
+            },
+            O: function O() {
+                // Difference to GMT in hour format; e.g. +0200
+                var tzo = jsdate.getTimezoneOffset();
+                var a = Math.abs(tzo);
+                return (tzo > 0 ? '-' : '+') + _pad(Math.floor(a / 60) * 100 + a % 60, 4);
+            },
+            P: function P() {
+                // Difference to GMT w/colon; e.g. +02:00
+                var O = f.O();
+                return O.substr(0, 3) + ':' + O.substr(3, 2);
+            },
+            T: function T() {
+                // The following works, but requires inclusion of the very
+                // large timezone_abbreviations_list() function.
+                /*              var abbr, i, os, _default;
+                 if (!tal.length) {
+                 tal = that.timezone_abbreviations_list();
+                 }
+                 if ($locutus && $locutus.default_timezone) {
+                 _default = $locutus.default_timezone;
+                 for (abbr in tal) {
+                 for (i = 0; i < tal[abbr].length; i++) {
+                 if (tal[abbr][i].timezone_id === _default) {
+                 return abbr.toUpperCase();
+                 }
+                 }
+                 }
+                 }
+                 for (abbr in tal) {
+                 for (i = 0; i < tal[abbr].length; i++) {
+                 os = -jsdate.getTimezoneOffset() * 60;
+                 if (tal[abbr][i].offset === os) {
+                 return abbr.toUpperCase();
+                 }
+                 }
+                 }
+                 */
+                return 'UTC';
+            },
+            Z: function Z() {
+                // Timezone offset in seconds (-43200...50400)
+                return -jsdate.getTimezoneOffset() * 60;
+            },
+
+            // Full Date/Time
+            c: function c() {
+                // ISO-8601 date.
+                return 'Y-m-d\\TH:i:sP'.replace(formatChr, formatChrCb);
+            },
+            r: function r() {
+                // RFC 2822
+                return 'D, d M Y H:i:s O'.replace(formatChr, formatChrCb);
+            },
+            U: function U() {
+                // Seconds since UNIX epoch
+                return jsdate / 1000 | 0;
+            }
+        };
+
+        var _date = function _date(format, timestamp) {
+            jsdate = timestamp === undefined ? new Date() // Not provided
+                : timestamp instanceof Date ? new Date(timestamp) // JS Date()
+                    : new Date(timestamp * 1000) // UNIX timestamp (auto-convert to int)
+            ;
+            return format.replace(formatChr, formatChrCb);
+        };
+
+        return _date(format, timestamp);
     };
 
     return Twig;
@@ -3264,7 +3224,7 @@ var Twig = {
             return value === params[0];
         },
         iterable: function (value) {
-            return value && (Twig.lib.is("Array", value) || Twig.lib.is("Object", value));
+            return value && (Twig._is("Array", value) || Twig._is("Object", value));
         }
     };
 
@@ -3336,11 +3296,6 @@ var Twig = {
         Twig.test.extend(test, definition);
     };
 
-    // Extend Twig with a new definition.
-    Twig.exports.extendTag = function (definition) {
-        Twig.logic.extend(definition);
-    };
-
     // Provide an environment for extending Twig core.
     // Calls fn with the internal Twig object.
     Twig.exports.extend = function (fn) {
@@ -3348,8 +3303,10 @@ var Twig = {
     };
 
     //Export our filters.
-    //Resolves #307
     Twig.exports.filters = Twig.filters;
+
+    //Export our libs.
+    Twig.exports.lib = Twig.lib;
 
     return Twig;
 })(Twig);
