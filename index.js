@@ -1,5 +1,6 @@
 /**
  * RBC twigjs render
+ * Base on twigis 0.10.3
  *
  * @copyright 2011-2016 John Roepke and the Twig.js Contributors
  * @license   Available under the BSD 2-Clause License
@@ -210,7 +211,7 @@ var Twig = {
 
                     case Twig.token.type.logic:
                         var logic_token = token.token,
-                            logic = Twig.logic.parse.apply(that, [logic_token, context, chain]);
+                            logic = Twig.logic.parse.call(that, logic_token, context, chain);
 
                         if (logic.chain !== undefined) {
                             chain = logic.chain;
@@ -234,12 +235,12 @@ var Twig = {
                     case Twig.token.type.output:
                         Twig.log.debug("Twig.parse: ", "Output token: ", token.stack);
                         // Parse the given expression in the given context
-                        output.push(Twig.expression.parse.apply(that, [token.stack, context]));
+                        output.push(Twig.expression.parse.call(that, token.stack, context));
                         break;
                 }
             });
 
-            return Twig.output.apply(this, [output]);
+            return Twig.output.call(this, output);
 
         } catch (ex) {
             if (this.options.rethrow) {
@@ -273,13 +274,13 @@ var Twig = {
         }
 
         var strategy = 'html';
-        if (typeof this.options.autoescape == 'string')
+        if (typeof this.options.autoescape === 'string')
             strategy = this.options.autoescape;
 
         // [].map would be better but it's not supported by IE8-
         var escaped_output = [];
         Twig.forEach(output, function (str) {
-            if (str && (str.twig_markup !== true && str.twig_markup != strategy)) {
+            if (str && (str.twig_markup !== true && str.twig_markup !== strategy)) {
                 str = Twig.filters.escape(str, [strategy]);
             }
             escaped_output.push(str);
@@ -435,7 +436,7 @@ var Twig = {
         this.reset(blocks);
 
         if (Twig._is('String', data)) {
-            this.tokens = Twig.prepare.apply(this, [data]);
+            this.tokens = Twig.prepare.call(this, data);
         } else {
             this.tokens = data;
         }
@@ -469,7 +470,7 @@ var Twig = {
             this.blocks = params.blocks;
         }
 
-        var output = Twig.parse.apply(this, [this.tokens, this.context]);
+        var output = Twig.parse.call(this, this.tokens, this.context);
 
         // Does this template extend another
         if (this.extend) {
@@ -617,7 +618,7 @@ var Twig = {
             parse: function (token, context, chain) {
                 var output = '',
                     // Parse the expression
-                    result = Twig.expression.parse.apply(this, [token.stack, context]);
+                    result = Twig.expression.parse.call(this, token.stack, context);
 
                 // Start a new logic chain
                 chain = true;
@@ -625,7 +626,7 @@ var Twig = {
                 if (Twig.lib.boolval(result)) {
                     chain = false;
                     // parse if output
-                    output = Twig.parse.apply(this, [token.output, context]);
+                    output = Twig.parse.call(this, token.output, context);
                 }
                 return {
                     chain: chain,
@@ -642,12 +643,12 @@ var Twig = {
             type: Twig.logic.type.elseif,
             parse: function (token, context, chain) {
                 var output = '',
-                    result = Twig.expression.parse.apply(this, [token.stack, context]);
+                    result = Twig.expression.parse.call(this, token.stack, context);
 
                 if (chain && Twig.lib.boolval(result)) {
                     chain = false;
                     // parse if output
-                    output = Twig.parse.apply(this, [token.output, context]);
+                    output = Twig.parse.call(this, token.output, context);
                 }
 
                 return {
@@ -666,7 +667,7 @@ var Twig = {
             parse: function (token, context, chain) {
                 var output = '';
                 if (chain) {
-                    output = Twig.parse.apply(this, [token.output, context]);
+                    output = Twig.parse.call(this, token.output, context);
                 }
                 return {
                     chain: chain,
@@ -691,7 +692,7 @@ var Twig = {
             type: Twig.logic.type.for_,
             parse: function (token, context, continue_chain) {
                 // Parse expression
-                var result = Twig.expression.parse.apply(this, [token.expression, context]),
+                var result = Twig.expression.parse.call(this, token.expression, context),
                     output = [],
                     len,
                     index = 0,
@@ -725,8 +726,8 @@ var Twig = {
                         inner_context.loop = buildLoop(index, len);
 
                         if (conditional === undefined ||
-                            Twig.expression.parse.apply(that, [conditional, inner_context])) {
-                            output.push(Twig.parse.apply(that, [token.output, inner_context]));
+                            Twig.expression.parse.call(that, conditional, inner_context)) {
+                            output.push(Twig.parse.call(that, token.output, inner_context));
                             index += 1;
                         }
 
@@ -768,7 +769,7 @@ var Twig = {
 
                 return {
                     chain: continue_chain,
-                    output: Twig.output.apply(this, [output])
+                    output: Twig.output.call(this, output)
                 };
             }
         },
@@ -789,7 +790,7 @@ var Twig = {
              */
             type: Twig.logic.type.set,
             parse: function (token, context, continue_chain) {
-                var value = Twig.expression.parse.apply(this, [token.expression, context]),
+                var value = Twig.expression.parse.call(this, token.expression, context),
                     key = token.key;
 
                 if (value === context) {
@@ -817,7 +818,7 @@ var Twig = {
             type: Twig.logic.type.setcapture,
             parse: function (token, context, continue_chain) {
 
-                var value = Twig.parse.apply(this, [token.output, context]),
+                var value = Twig.parse.call(this, token.output, context),
                     key = token.key;
 
                 // set on both the global and local context
@@ -846,13 +847,13 @@ var Twig = {
              */
             type: Twig.logic.type.filter,
             parse: function (token, context, chain) {
-                var unfiltered = Twig.parse.apply(this, [token.output, context]),
+                var unfiltered = Twig.parse.call(this, token.output, context),
                     stack = [{
                         type: Twig.expression.type.string,
                         value: unfiltered
                     }].concat(token.stack);
 
-                var output = Twig.expression.parse.apply(this, [stack, context]);
+                var output = Twig.expression.parse.call(this, stack, context);
 
                 return {
                     chain: chain,
@@ -886,15 +887,15 @@ var Twig = {
                 if (this.blocks[token.block] === undefined || isImported || hasParent || context.loop || token.overwrite) {
                     if (token.expression) {
                         // Short blocks have output as an expression on the open tag (no body)
-                        block_output = Twig.expression.parse.apply(this, [{
+                        block_output = Twig.expression.parse.call(this, {
                             type: Twig.expression.type.string,
-                            value: Twig.expression.parse.apply(this, [token.output, context])
-                        }, context]);
+                            value: Twig.expression.parse.call(this, token.output, context)
+                        }, context);
                     } else {
-                        block_output = Twig.expression.parse.apply(this, [{
+                        block_output = Twig.expression.parse.call(this, {
                             type: Twig.expression.type.string,
-                            value: Twig.parse.apply(this, [token.output, context])
-                        }, context]);
+                            value: Twig.parse.call(this, token.output, context)
+                        }, context);
                     }
 
                     if (isImported) {
@@ -959,7 +960,7 @@ var Twig = {
                 var template,
                     innerContext = Twig.ChildContext(context);
                 // Resolve filename
-                var file = Twig.expression.parse.apply(this, [token.stack, context]);
+                var file = Twig.expression.parse.call(this, token.stack, context);
 
                 // Set parent template
                 this.extend = file;
@@ -992,7 +993,7 @@ var Twig = {
             type: Twig.logic.type.use,
             parse: function (token, context, chain) {
                 // Resolve filename
-                var file = Twig.expression.parse.apply(this, [token.stack, context]);
+                var file = Twig.expression.parse.call(this, token.stack, context);
 
                 // Import blocks
                 this.importBlocks(file);
@@ -1022,7 +1023,7 @@ var Twig = {
                 }
 
                 if (token.withStack !== undefined) {
-                    withContext = Twig.expression.parse.apply(this, [token.withStack, context]);
+                    withContext = Twig.expression.parse.call(this, token.withStack, context);
 
                     for (i in withContext) {
                         if (withContext.hasOwnProperty(i))
@@ -1030,7 +1031,7 @@ var Twig = {
                     }
                 }
 
-                var file = Twig.expression.parse.apply(this, [token.stack, context]);
+                var file = Twig.expression.parse.call(this, token.stack, context);
 
                 if (file instanceof Twig.Template) {
                     template = file;
@@ -1061,7 +1062,7 @@ var Twig = {
             // Parse the html and return it without any spaces between tags
             parse: function (token, context, chain) {
                 var // Parse the output without any filter
-                    unfiltered = Twig.parse.apply(this, [token.output, context]),
+                    unfiltered = Twig.parse.call(this, token.output, context),
                     // A regular expression to find closing and opening tags with spaces between them
                     rBetweenTagSpaces = />\s+</g,
                     // Replace all space between closing and opening html tags
@@ -1102,7 +1103,7 @@ var Twig = {
                 }
 
                 if (token.withStack !== undefined) {
-                    withContext = Twig.expression.parse.apply(this, [token.withStack, context]);
+                    withContext = Twig.expression.parse.call(this, token.withStack, context);
 
                     for (i in withContext) {
                         if (withContext.hasOwnProperty(i))
@@ -1110,7 +1111,7 @@ var Twig = {
                     }
                 }
 
-                var file = Twig.expression.parse.apply(this, [token.stack, innerContext]);
+                var file = Twig.expression.parse.call(this, token.stack, innerContext);
 
                 if (file instanceof Twig.Template) {
                     template = file;
@@ -1134,7 +1135,7 @@ var Twig = {
                 this.blocks = {};
 
                 // parse tokens. output will be not used
-                var output = Twig.parse.apply(this, [token.output, innerContext]);
+                var output = Twig.parse.call(this, token.output, innerContext);
 
                 // render tempalte with blocks defined in embed block
                 return {
@@ -1230,7 +1231,7 @@ var Twig = {
         token_template = Twig.logic.handler[token.type];
 
         if (token_template.parse) {
-            output = token_template.parse.apply(this, [token, context, chain]);
+            output = token_template.parse.call(this, token, context, chain);
         }
         return output;
     };
@@ -1265,12 +1266,11 @@ var Twig = {
             rightToLeft: 'rightToLeft'
         };
 
-        var containment = function (a, b) {
-            if (b === undefined || b === null) {
-                return null;
-            } else if (b.indexOf !== undefined) {
+        var containment = function(a, b) {
+            if (b.indexOf !== undefined) {
                 // String
                 return a === b || a !== '' && b.indexOf(a) > -1;
+
             } else {
                 var el;
                 for (el in b) {
@@ -1290,47 +1290,16 @@ var Twig = {
         Twig.expression.operator.parse = function (operator, stack) {
             Twig.log.trace("Twig.expression.operator.parse: ", "Handling ", operator);
             var a, b, c;
-
-            if (operator === '?') {
-                c = stack.pop();
-            }
-
-            b = stack.pop();
-            if (operator !== 'not') {
-                a = stack.pop();
-            }
-
-            if (operator !== 'in' && operator !== 'not in') {
-                if (a && Array.isArray(a)) {
-                    a = a.length;
-                }
-
-                if (b && Array.isArray(b)) {
-                    b = b.length;
-                }
-            }
-
             switch (operator) {
                 case ':':
                     // Ignore
                     break;
 
-                case '?:':
-                    if (Twig.lib.boolval(a)) {
-                        stack.push(a);
-                    } else {
-                        stack.push(b);
-                    }
-                    break;
                 case '?':
-                    if (a === undefined) {
-                        //An extended ternary.
-                        a = b;
-                        b = c;
-                        c = undefined;
-                    }
-
-                    if (Twig.lib.boolval(a)) {
+                    c = stack.pop(); // false expr
+                    b = stack.pop(); // true expr
+                    a = stack.pop(); // conditional
+                    if (a) {
                         stack.push(b);
                     } else {
                         stack.push(c);
@@ -1338,110 +1307,140 @@ var Twig = {
                     break;
 
                 case '+':
-                    b = parseFloat(b);
-                    a = parseFloat(a);
+                    b = parseFloat(stack.pop());
+                    a = parseFloat(stack.pop());
                     stack.push(a + b);
                     break;
 
                 case '-':
-                    b = parseFloat(b);
-                    a = parseFloat(a);
+                    b = parseFloat(stack.pop());
+                    a = parseFloat(stack.pop());
                     stack.push(a - b);
                     break;
 
                 case '*':
-                    b = parseFloat(b);
-                    a = parseFloat(a);
+                    b = parseFloat(stack.pop());
+                    a = parseFloat(stack.pop());
                     stack.push(a * b);
                     break;
 
                 case '/':
-                    b = parseFloat(b);
-                    a = parseFloat(a);
+                    b = parseFloat(stack.pop());
+                    a = parseFloat(stack.pop());
                     stack.push(a / b);
                     break;
 
                 case '//':
-                    b = parseFloat(b);
-                    a = parseFloat(a);
-                    stack.push(Math.floor(a / b));
+                    b = parseFloat(stack.pop());
+                    a = parseFloat(stack.pop());
+                    stack.push(parseInt(a / b));
                     break;
 
                 case '%':
-                    b = parseFloat(b);
-                    a = parseFloat(a);
+                    b = parseFloat(stack.pop());
+                    a = parseFloat(stack.pop());
                     stack.push(a % b);
                     break;
 
                 case '~':
-                    stack.push((a != null ? a.toString() : "")
-                        + (b != null ? b.toString() : ""));
+                    b = stack.pop();
+                    a = stack.pop();
+                    stack.push( (a != null ? a.toString() : "")
+                        + (b != null ? b.toString() : "") );
                     break;
 
                 case 'not':
                 case '!':
-                    stack.push(!Twig.lib.boolval(b));
+                    stack.push(!stack.pop());
                     break;
 
                 case '<':
+                    b = stack.pop();
+                    a = stack.pop();
                     stack.push(a < b);
                     break;
 
                 case '<=':
+                    b = stack.pop();
+                    a = stack.pop();
                     stack.push(a <= b);
                     break;
 
                 case '>':
+                    b = stack.pop();
+                    a = stack.pop();
                     stack.push(a > b);
                     break;
 
                 case '>=':
+                    b = stack.pop();
+                    a = stack.pop();
                     stack.push(a >= b);
                     break;
 
                 case '===':
+                    b = stack.pop();
+                    a = stack.pop();
                     stack.push(a === b);
                     break;
 
                 case '==':
+                    b = stack.pop();
+                    a = stack.pop();
                     stack.push(a == b);
                     break;
 
                 case '!==':
+                    b = stack.pop();
+                    a = stack.pop();
                     stack.push(a !== b);
                     break;
 
                 case '!=':
+                    b = stack.pop();
+                    a = stack.pop();
                     stack.push(a != b);
                     break;
 
                 case 'or':
+                    b = stack.pop();
+                    a = stack.pop();
                     stack.push(a || b);
                     break;
 
                 case 'and':
+                    b = stack.pop();
+                    a = stack.pop();
                     stack.push(a && b);
                     break;
 
                 case '**':
+                    b = stack.pop();
+                    a = stack.pop();
                     stack.push(Math.pow(a, b));
                     break;
 
+
                 case 'not in':
-                    stack.push(!containment(a, b));
+                    b = stack.pop();
+                    a = stack.pop();
+                    stack.push( !containment(a, b) );
                     break;
 
                 case 'in':
-                    stack.push(containment(a, b));
+                    b = stack.pop();
+                    a = stack.pop();
+                    stack.push( containment(a, b) );
                     break;
 
                 case '..':
-                    stack.push(Twig.functions.range(a, b));
+                    b = stack.pop();
+                    a = stack.pop();
+                    stack.push( Twig.functions.range(a, b) );
                     break;
 
                 default:
-                    debugger;
-                    throw new Twig.Error("Failed to parse operator: " + operator + " is an unknown operator.");
+                    throw new Twig.Error(operator + " is an unknown operator.");
             }
         };
 
@@ -1534,10 +1533,10 @@ var Twig = {
     // Some commonly used compile and parse functions.
     Twig.expression.fn = {
         parse: {
-            push: function (token, stack, context) {
+            push: function (token, stack) {
                 stack.push(token);
             },
-            push_value: function (token, stack, context) {
+            push_value: function (token, stack) {
                 stack.push(token.value);
             }
         }
@@ -1564,7 +1563,7 @@ var Twig = {
             type: Twig.expression.type.test,
             parse: function (token, stack, context) {
                 var value = stack.pop(),
-                    params = token.params && Twig.expression.parse.apply(this, [token.params, context]),
+                    params = token.params && Twig.expression.parse.call(this, token.params, context),
                     result = Twig.test(token.filter, value, params);
 
                 if (token.modifier == 'not') {
@@ -1592,7 +1591,7 @@ var Twig = {
                     stack.push(token);
                 } else if (token.params) {
                     // handle "{(expression):value}"
-                    token.key = Twig.expression.parse.apply(this, [token.params, context]);
+                    token.key = Twig.expression.parse.call(this, token.params, context);
                     stack.push(token);
 
                     //If we're in a loop, we might need token.params later, especially in this form of "(expression):value"
@@ -1630,12 +1629,10 @@ var Twig = {
              */
             type: Twig.expression.type.subexpression.end,
             parse: function (token, stack, context) {
-                var new_array = [],
-                    array_ended = false,
-                    value = null;
+                var value = null;
 
                 if (token.expression) {
-                    value = Twig.expression.parse.apply(this, [token.params, context]);
+                    value = Twig.expression.parse.call(this, token.params, context);
                     stack.push(value);
                 } else {
                     throw new Twig.Error("Unexpected subexpression end when token is not marked as an expression");
@@ -1660,7 +1657,7 @@ var Twig = {
                     value = null;
 
                 if (token.expression) {
-                    value = Twig.expression.parse.apply(this, [token.params, context])
+                    value = Twig.expression.parse.call(this, token.params, context);
                     stack.push(value);
 
                 } else {
@@ -1689,7 +1686,7 @@ var Twig = {
                 var input = stack.pop(),
                     params = token.params;
 
-                stack.push(Twig.filter.apply(this, [token.value, input, params]));
+                stack.push(Twig.filter.call(this, token.value, input, params));
             }
         },
         {
@@ -1796,15 +1793,15 @@ var Twig = {
             type: Twig.expression.type.filter,
             parse: function (token, stack, context) {
                 var input = stack.pop(),
-                    params = token.params && Twig.expression.parse.apply(this, [token.params, context]);
+                    params = token.params && Twig.expression.parse.call(this, token.params, context);
 
-                stack.push(Twig.filter.apply(this, [token.value, input, params]));
+                stack.push(Twig.filter.call(this, token.value, input, params));
             }
         },
         {
             type: Twig.expression.type._function,
             parse: function (token, stack, context) {
-                var params = token.params && Twig.expression.parse.apply(this, [token.params, context]),
+                var params = token.params && Twig.expression.parse.call(this, token.params, context),
                     fn = token.fn,
                     value;
 
@@ -1836,14 +1833,14 @@ var Twig = {
             type: Twig.expression.type.variable,
             parse: function (token, stack, context) {
                 // Get the variable from the context
-                var value = Twig.expression.resolve.apply(this, [context[token.value], context]);
+                var value = Twig.expression.resolve.call(this, context[token.value], context);
                 stack.push(value);
             }
         },
         {
             type: Twig.expression.type.key.period,
             parse: function (token, stack, context, next_token) {
-                var params = token.params && Twig.expression.parse.apply(this, [token.params, context]),
+                var params = token.params && Twig.expression.parse.call(this, token.params, context),
                     key = token.key,
                     object = stack.pop(),
                     value;
@@ -1872,15 +1869,15 @@ var Twig = {
                 }
 
                 // When resolving an expression we need to pass next_token in case the expression is a function
-                stack.push(Twig.expression.resolve.apply(this, [value, context, params, next_token]));
+                stack.push(Twig.expression.resolve.call(this, value, context, params, next_token));
             }
         },
         {
             type: Twig.expression.type.key.brackets,
             parse: function (token, stack, context, next_token) {
                 // Evaluate key
-                var params = token.params && Twig.expression.parse.apply(this, [token.params, context]),
-                    key = Twig.expression.parse.apply(this, [token.stack, context]),
+                var params = token.params && Twig.expression.parse.call(this, token.params, context),
+                    key = Twig.expression.parse.call(this, token.stack, context),
                     object = stack.pop(),
                     value;
 
@@ -1900,7 +1897,7 @@ var Twig = {
                 }
 
                 // When resolving an expression we need to pass next_token in case the expression is a function
-                stack.push(Twig.expression.resolve.apply(this, [value, object, params, next_token]));
+                stack.push(Twig.expression.resolve.call(this, value, object, params, next_token));
             }
         },
         {
@@ -1951,7 +1948,7 @@ var Twig = {
                 //When parsing these parameters, we need to get them all back, not just the last item on the stack.
                 var tokens_are_parameters = true;
 
-                params = next_token.params && Twig.expression.parse.apply(this, [next_token.params, context, tokens_are_parameters]);
+                params = next_token.params && Twig.expression.parse.call(this, next_token.params, context, tokens_are_parameters);
 
                 //Clean up the parentheses tokens on the next loop
                 next_token.cleanup = true;
@@ -2023,7 +2020,7 @@ var Twig = {
         var that = this;
 
         // If the token isn't an array, make it one.
-        if (!(tokens instanceof Array)) {
+        if (!Array.isArray(tokens)) {
             tokens = [tokens];
         }
 
@@ -2046,7 +2043,7 @@ var Twig = {
 
             token_template = Twig.expression.handler[token.type];
 
-            token_template.parse && token_template.parse.apply(that, [token, stack, context, next_token]);
+            token_template.parse && token_template.parse.call(that, token, stack, context, next_token);
 
             //Store any binary tokens for later if we are in a loop.
             if (context.loop && token.type === Twig.expression.type.operator.binary) {
@@ -2397,7 +2394,7 @@ var Twig = {
         if (!Twig.filters[filter]) {
             throw "Unable to find filter " + filter;
         }
-        return Twig.filters[filter].apply(this, [value, params]);
+        return Twig.filters[filter].call(this, value, params);
     };
 
     Twig.filter.extend = function (filter, definition) {
@@ -2488,9 +2485,7 @@ var Twig = {
 
             function getRandomNumber(n) {
                 var random = Math.floor(Math.random() * LIMIT_INT31);
-                var limits = [0, n];
-                var min = Math.min.apply(null, limits), max = Math.max.apply(null, limits);
-
+                var min = Math.min.call(null, 0, n), max = Math.max.call(null, 0, n);
                 return min + Math.floor((max - min + 1) * random / LIMIT_INT31);
             }
 
@@ -2595,24 +2590,18 @@ var Twig = {
         //   returns 10: false
         //   example 11: boolval('true')
         //   returns 11: true
+        //   example 12: boolval(NaN)
+        //   returns 12: false
 
-        if (mixedVar === false) {
+        if (!mixedVar) {
             return false;
         }
 
-        if (mixedVar === 0 || mixedVar === 0.0) {
-            return false;
-        }
-
-        if (mixedVar === '' || mixedVar === '0') {
+        if (mixedVar === '0' || mixedVar === '0.0') {
             return false;
         }
 
         if (Array.isArray(mixedVar) && mixedVar.length === 0) {
-            return false;
-        }
-
-        if (mixedVar === null || mixedVar === undefined) {
             return false;
         }
 
