@@ -1,6 +1,5 @@
 /**
  * RBC twigjs render
- * Base on twigis 0.10.3
  *
  * @copyright 2011-2016 John Roepke and the Twig.js Contributors
  * @license   Available under the BSD 2-Clause License
@@ -8,7 +7,7 @@
  */
 
 var Twig = {
-    VERSION: '0.0.7',
+    VERSION: '0.0.8',
     _is: function (type, obj) {
         var clas = Object.prototype.toString.call(obj).slice(8, -1);
         return obj !== undefined && obj !== null && clas === type;
@@ -562,27 +561,31 @@ var Twig = {
      * Logic token types.
      */
     Twig.logic.type = {
-        if_: 'Twig.logic.type.if',
-        endif: 'Twig.logic.type.endif',
-        for_: 'Twig.logic.type.for',
-        endfor: 'Twig.logic.type.endfor',
-        else_: 'Twig.logic.type.else',
-        elseif: 'Twig.logic.type.elseif',
-        set: 'Twig.logic.type.set',
-        setcapture: 'Twig.logic.type.setcapture',
-        endset: 'Twig.logic.type.endset',
-        filter: 'Twig.logic.type.filter',
+        if_:       'Twig.logic.type.if',
+        endif:     'Twig.logic.type.endif',
+        for_:      'Twig.logic.type.for',
+        endfor:    'Twig.logic.type.endfor',
+        else_:     'Twig.logic.type.else',
+        elseif:    'Twig.logic.type.elseif',
+        set:       'Twig.logic.type.set',
+        setcapture:'Twig.logic.type.setcapture',
+        endset:    'Twig.logic.type.endset',
+        filter:    'Twig.logic.type.filter',
         endfilter: 'Twig.logic.type.endfilter',
         shortblock: 'Twig.logic.type.shortblock',
-        block: 'Twig.logic.type.block',
-        endblock: 'Twig.logic.type.endblock',
-        extends_: 'Twig.logic.type.extends',
-        use: 'Twig.logic.type.use',
-        include: 'Twig.logic.type.include',
+        block:     'Twig.logic.type.block',
+        endblock:  'Twig.logic.type.endblock',
+        extends_:  'Twig.logic.type.extends',
+        use:       'Twig.logic.type.use',
+        include:   'Twig.logic.type.include',
         spaceless: 'Twig.logic.type.spaceless',
         endspaceless: 'Twig.logic.type.endspaceless',
-        embed: 'Twig.logic.type.embed',
-        endembed: 'Twig.logic.type.endembed'
+        macro:     'Twig.logic.type.macro',
+        endmacro:  'Twig.logic.type.endmacro',
+        import_:   'Twig.logic.type.import',
+        from:      'Twig.logic.type.from',
+        embed:     'Twig.logic.type.embed',
+        endembed:  'Twig.logic.type.endembed'
     };
 
 
@@ -1267,10 +1270,11 @@ var Twig = {
         };
 
         var containment = function(a, b) {
-            if (b.indexOf !== undefined) {
+            if (b === undefined || b === null) {
+                return null;
+            } else if (b.indexOf !== undefined) {
                 // String
                 return a === b || a !== '' && b.indexOf(a) > -1;
-
             } else {
                 var el;
                 for (el in b) {
@@ -1290,16 +1294,47 @@ var Twig = {
         Twig.expression.operator.parse = function (operator, stack) {
             Twig.log.trace("Twig.expression.operator.parse: ", "Handling ", operator);
             var a, b, c;
+
+            if (operator === '?') {
+                c = stack.pop();
+            }
+
+            b = stack.pop();
+            if (operator !== 'not') {
+                a = stack.pop();
+            }
+
+            if (operator !== 'in' && operator !== 'not in') {
+                if (a && Array.isArray(a)) {
+                    a = a.length;
+                }
+
+                if (b && Array.isArray(b)) {
+                    b = b.length;
+                }
+            }
+
             switch (operator) {
                 case ':':
                     // Ignore
                     break;
 
+                case '?:':
+                    if (Twig.lib.boolval(a)) {
+                        stack.push(a);
+                    } else {
+                        stack.push(b);
+                    }
+                    break;
                 case '?':
-                    c = stack.pop(); // false expr
-                    b = stack.pop(); // true expr
-                    a = stack.pop(); // conditional
-                    if (a) {
+                    if (a === undefined) {
+                        //An extended ternary.
+                        a = b;
+                        b = c;
+                        c = undefined;
+                    }
+
+                    if (Twig.lib.boolval(a)) {
                         stack.push(b);
                     } else {
                         stack.push(c);
@@ -1307,140 +1342,122 @@ var Twig = {
                     break;
 
                 case '+':
-                    b = parseFloat(stack.pop());
-                    a = parseFloat(stack.pop());
+                    b = parseFloat(b);
+                    a = parseFloat(a);
                     stack.push(a + b);
                     break;
 
                 case '-':
-                    b = parseFloat(stack.pop());
-                    a = parseFloat(stack.pop());
+                    b = parseFloat(b);
+                    a = parseFloat(a);
                     stack.push(a - b);
                     break;
 
                 case '*':
-                    b = parseFloat(stack.pop());
-                    a = parseFloat(stack.pop());
+                    b = parseFloat(b);
+                    a = parseFloat(a);
                     stack.push(a * b);
                     break;
 
                 case '/':
-                    b = parseFloat(stack.pop());
-                    a = parseFloat(stack.pop());
+                    b = parseFloat(b);
+                    a = parseFloat(a);
                     stack.push(a / b);
                     break;
 
                 case '//':
-                    b = parseFloat(stack.pop());
-                    a = parseFloat(stack.pop());
-                    stack.push(parseInt(a / b));
+                    b = parseFloat(b);
+                    a = parseFloat(a);
+                    stack.push(Math.floor(a / b));
                     break;
 
                 case '%':
-                    b = parseFloat(stack.pop());
-                    a = parseFloat(stack.pop());
+                    b = parseFloat(b);
+                    a = parseFloat(a);
                     stack.push(a % b);
                     break;
 
                 case '~':
-                    b = stack.pop();
-                    a = stack.pop();
                     stack.push( (a != null ? a.toString() : "")
                         + (b != null ? b.toString() : "") );
                     break;
 
                 case 'not':
                 case '!':
-                    stack.push(!stack.pop());
+                    stack.push(!Twig.lib.boolval(b));
                     break;
 
                 case '<':
-                    b = stack.pop();
-                    a = stack.pop();
                     stack.push(a < b);
                     break;
 
                 case '<=':
-                    b = stack.pop();
-                    a = stack.pop();
                     stack.push(a <= b);
                     break;
 
                 case '>':
-                    b = stack.pop();
-                    a = stack.pop();
                     stack.push(a > b);
                     break;
 
                 case '>=':
-                    b = stack.pop();
-                    a = stack.pop();
                     stack.push(a >= b);
                     break;
 
                 case '===':
-                    b = stack.pop();
-                    a = stack.pop();
                     stack.push(a === b);
                     break;
 
                 case '==':
-                    b = stack.pop();
-                    a = stack.pop();
                     stack.push(a == b);
                     break;
 
                 case '!==':
-                    b = stack.pop();
-                    a = stack.pop();
                     stack.push(a !== b);
                     break;
 
                 case '!=':
-                    b = stack.pop();
-                    a = stack.pop();
                     stack.push(a != b);
                     break;
 
                 case 'or':
-                    b = stack.pop();
-                    a = stack.pop();
                     stack.push(a || b);
                     break;
 
+                case 'b-or':
+                    stack.push(a | b);
+                    break;
+
+                case 'b-xor':
+                    stack.push(a ^ b);
+                    break;
+
                 case 'and':
-                    b = stack.pop();
-                    a = stack.pop();
                     stack.push(a && b);
                     break;
 
+                case 'b-and':
+                    stack.push(a & b);
+                    break;
+
                 case '**':
-                    b = stack.pop();
-                    a = stack.pop();
                     stack.push(Math.pow(a, b));
                     break;
 
-
                 case 'not in':
-                    b = stack.pop();
-                    a = stack.pop();
                     stack.push( !containment(a, b) );
                     break;
 
                 case 'in':
-                    b = stack.pop();
-                    a = stack.pop();
                     stack.push( containment(a, b) );
                     break;
 
                 case '..':
-                    b = stack.pop();
-                    a = stack.pop();
                     stack.push( Twig.functions.range(a, b) );
                     break;
 
                 default:
-                    throw new Twig.Error(operator + " is an unknown operator.");
+                    debugger;
+                    throw new Twig.Error("Failed to parse operator: " + operator + " is an unknown operator.");
             }
         };
 
@@ -1452,48 +1469,48 @@ var Twig = {
      * Reserved word that can't be used as variable names.
      */
     Twig.expression.reservedWords = [
-        "true", "false", "null", "TRUE", "FALSE", "NULL", "_context", "and", "or", "in", "not in", "if"
+        "true", "false", "null", "TRUE", "FALSE", "NULL", "_context", "and", "b-and", "or", "b-or", "b-xor", "in", "not in", "if"
     ];
 
     /**
      * The type of tokens used in expressions.
      */
     Twig.expression.type = {
-        comma: 'Twig.expression.type.comma',
+        comma:      'Twig.expression.type.comma',
         operator: {
-            unary: 'Twig.expression.type.operator.unary',
+            unary:  'Twig.expression.type.operator.unary',
             binary: 'Twig.expression.type.operator.binary'
         },
-        string: 'Twig.expression.type.string',
-        bool: 'Twig.expression.type.bool',
-        slice: 'Twig.expression.type.slice',
+        string:     'Twig.expression.type.string',
+        bool:       'Twig.expression.type.bool',
+        slice:      'Twig.expression.type.slice',
         array: {
-            start: 'Twig.expression.type.array.start',
-            end: 'Twig.expression.type.array.end'
+            start:  'Twig.expression.type.array.start',
+            end:    'Twig.expression.type.array.end'
         },
         object: {
-            start: 'Twig.expression.type.object.start',
-            end: 'Twig.expression.type.object.end'
+            start:  'Twig.expression.type.object.start',
+            end:    'Twig.expression.type.object.end'
         },
         parameter: {
-            start: 'Twig.expression.type.parameter.start',
-            end: 'Twig.expression.type.parameter.end'
+            start:  'Twig.expression.type.parameter.start',
+            end:    'Twig.expression.type.parameter.end'
         },
         subexpression: {
-            start: 'Twig.expression.type.subexpression.start',
-            end: 'Twig.expression.type.subexpression.end'
+            start:  'Twig.expression.type.subexpression.start',
+            end:    'Twig.expression.type.subexpression.end'
         },
         key: {
-            period: 'Twig.expression.type.key.period',
+            period:   'Twig.expression.type.key.period',
             brackets: 'Twig.expression.type.key.brackets'
         },
-        filter: 'Twig.expression.type.filter',
-        _function: 'Twig.expression.type._function',
-        variable: 'Twig.expression.type.variable',
-        number: 'Twig.expression.type.number',
-        _null: 'Twig.expression.type.null',
-        context: 'Twig.expression.type.context',
-        test: 'Twig.expression.type.test'
+        filter:     'Twig.expression.type.filter',
+        _function:  'Twig.expression.type._function',
+        variable:   'Twig.expression.type.variable',
+        number:     'Twig.expression.type.number',
+        _null:     'Twig.expression.type.null',
+        context:    'Twig.expression.type.context',
+        test:       'Twig.expression.type.test'
     };
 
     Twig.expression.set = {
@@ -1520,7 +1537,8 @@ var Twig = {
             Twig.expression.type.parameter.start,
             Twig.expression.type.array.start,
             Twig.expression.type.object.start,
-            Twig.expression.type.subexpression.start
+            Twig.expression.type.subexpression.start,
+            Twig.expression.type.operator.unary
         ]
     };
 
