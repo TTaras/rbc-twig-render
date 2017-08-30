@@ -7,7 +7,7 @@
  */
 
 var Twig = {
-    VERSION: '0.0.8',
+    VERSION: '0.0.10',
     _is: function (type, obj) {
         var clas = Object.prototype.toString.call(obj).slice(8, -1);
         return obj !== undefined && obj !== null && clas === type;
@@ -2208,7 +2208,8 @@ var Twig = {
         date: function(value, params) {
             var date = Twig.functions.date(value);
             var format = params && params.length ? params[0] : 'F j, Y H:i';
-            return Twig.lib.date(format, date);
+            var isUseClientTimezone = !!(params && params.length && params[1]);
+            return Twig.lib.date(format, date, isUseClientTimezone);
         },
         date_modify: function(value, params) {
             if (value === undefined || value === null) return;
@@ -2951,7 +2952,7 @@ var Twig = {
 
         return date.getTime() / 1000;
     };
-    Twig.lib.date = function date(format, timestamp) {
+    Twig.lib.date = function date(format, timestamp, isUseClientTimezone) {
         //   example 1: date('H:m:s \\m \\i\\s \\m\\o\\n\\t\\h', 1062402400)
         //   returns 1: '07:09:40 m is month'
         //   example 2: date('F j, Y, g:i a', 1062462400)
@@ -3217,15 +3218,65 @@ var Twig = {
             }
         };
 
-        var _date = function _date(format, timestamp) {
+        /**
+         * Get date in Moskow timezone
+         * @param {Mixed} [date]
+         * @return {Object.Date}
+         */
+        var _getDateMskTimezone = function(date) {
+            var localOffset = -(new Date()).getTimezoneOffset() * 60; // sec
+            var toMskOffset = 10800 - localOffset; // sec
+            var ts; // sec
+
+            if (date && date.getTime) {
+                if (toMskOffset === 0) return date;
+                ts = date.getTime() / 1000;
+            } else {
+                switch (typeof date) {
+                    // timestamp in seconds
+                    case 'number':
+                        ts = date;
+                        break;
+
+                    // parse string to date
+                    case 'string':
+                        date = new Date(date);
+                        if (date.getTime) {
+                            if (toMskOffset === 0) return date;
+                            ts = date.getTime() / 1000;
+                        } else {
+                            if (toMskOffset === 0) return new Date();
+                            ts = Date.now() / 1000;
+                        }
+                        break;
+
+                    // other fucking types
+                    default:
+                        ts = Date.now() / 1000;
+                }
+            }
+
+            return new Date((ts + toMskOffset) * 1000);
+        };
+
+        var _date = function _date(format, timestamp, isUseClientTimezone) {
             jsdate = timestamp === undefined ? new Date() // Not provided
                 : timestamp instanceof Date ? new Date(timestamp) // JS Date()
                     : new Date(timestamp * 1000) // UNIX timestamp (auto-convert to int)
             ;
+
+            if (!isUseClientTimezone) {
+                jsdate = (
+                    window.RA
+                    && window.RA.repo
+                    && window.RA.repo.helpers
+                    && window.RA.repo.helpers.getDateMskTimezone(jsdate)) || _getDateMskTimezone(jsdate);
+            }
+
             return format.replace(formatChr, formatChrCb);
         };
 
-        return _date(format, timestamp);
+        return _date(format, timestamp, isUseClientTimezone);
     };
 
     return Twig;
