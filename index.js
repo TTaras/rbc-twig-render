@@ -3266,11 +3266,7 @@ var Twig = {
             ;
 
             if (!isUseClientTimezone) {
-                jsdate = (
-                    window.RA
-                    && window.RA.repo
-                    && window.RA.repo.helpers
-                    && window.RA.repo.helpers.getDateMskTimezone(jsdate)) || _getDateMskTimezone(jsdate);
+                jsdate = _getDateMskTimezone(jsdate);
             }
 
             return format.replace(formatChr, formatChrCb);
