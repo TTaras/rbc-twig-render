@@ -7,15 +7,17 @@
  */
 
 var Twig = {
-    VERSION: '0.0.14',
+    VERSION: '0.0.15',
     _getType: function(obj) {
         return Object.prototype.toString.call(obj).slice(8, -1);
     },
     _is: function (type, obj) {
-        if (isNaN(obj)) {
-            return type === 'NaN';
+        var objType = Twig._getType(obj);
+
+        if (type === 'Number' && objType === 'Number') {
+            return !isNaN(obj);
         } else {
-            return Twig._getType(obj) === type;
+            return objType === type;
         }
     }
 };
