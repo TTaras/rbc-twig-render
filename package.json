@@ -1,6 +1,6 @@
 {
   "name": "rbc-twig-render",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "description": "Render pre-compiled Twigjs templates",
   "keywords": [
     "rbc",

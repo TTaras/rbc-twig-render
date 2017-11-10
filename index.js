@@ -7,13 +7,16 @@
  */
 
 var Twig = {
-    VERSION: '0.0.12',
+    VERSION: '0.0.13',
     _getType: function() {
         return Object.prototype.toString.call(obj).slice(8, -1);
     },
     _is: function (type, obj) {
-        if (type === 'NaN' && isNaN(obj)) return true;
-        return Twig._getType(obj) === type;
+        if (isNaN(obj)) {
+            return type === 'NaN';
+        } else {
+            return Twig._getType(obj) === type;
+        }
     }
 };
 
