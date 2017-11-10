@@ -7,8 +7,8 @@
  */
 
 var Twig = {
-    VERSION: '0.0.13',
-    _getType: function() {
+    VERSION: '0.0.14',
+    _getType: function(obj) {
         return Object.prototype.toString.call(obj).slice(8, -1);
     },
     _is: function (type, obj) {
