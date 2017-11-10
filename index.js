@@ -7,7 +7,7 @@
  */
 
 var Twig = {
-    VERSION: '0.0.15',
+    VERSION: '0.0.16',
     _getType: function(obj) {
         return Object.prototype.toString.call(obj).slice(8, -1);
     },
@@ -2160,7 +2160,7 @@ var Twig = {
             }
         },
         keys: function(value) {
-            if (value === undefined || value === null || isNaN(value)) return;
+            if (value === undefined || value === null) return;
 
             var keyset = value._keys || Object.keys(value)
             var output = [];
@@ -2175,7 +2175,7 @@ var Twig = {
             return output;
         },
         url_encode: function(value) {
-            if (value === undefined || value === null || isNaN(value)) return;
+            if (value === undefined || value === null) return;
 
             var result = encodeURIComponent(value);
             result = result.replace("'", "%27");
@@ -2183,7 +2183,7 @@ var Twig = {
             return result;
         },
         join: function(value, params) {
-            if (value === undefined || value === null || isNaN(value)) return;
+            if (value === undefined || value === null) return;
 
             var join_str = "",
                 output = [],
@@ -2212,7 +2212,7 @@ var Twig = {
                 throw new Twig.Error("default filter expects one argument");
             }
 
-            if (value === undefined || value === null || isNaN(value) || value === '') {
+            if (value === undefined || value === null || value === '') {
                 if (params === undefined) return '';
                 return params[0];
             } else {
@@ -2226,7 +2226,7 @@ var Twig = {
             return Twig.lib.date(format, date, isUseClientTimezone);
         },
         date_modify: function(value, params) {
-            if (value === undefined || value === null || isNaN(value)) return;
+            if (value === undefined || value === null) return;
 
             if (params === undefined || params.length !== 1) {
                 throw new Twig.Error("date_modify filter expects 1 argument");
@@ -2247,7 +2247,7 @@ var Twig = {
             return new Date(time * 1000);
         },
         replace: function(value, params) {
-            if (value === undefined || value === null || isNaN(value)) return;
+            if (value === undefined || value === null) return;
 
             var type = Twig._getType(value);
             if (type === 'String' || type === 'Number') {
@@ -2268,11 +2268,11 @@ var Twig = {
             }
         },
         striptags: function(value) {
-            if (value === undefined || value === null || isNaN(value)) return;
+            if (value === undefined || value === null) return;
             return Twig.lib.strip_tags(value);
         },
         escape: function(value, params) {
-            if (value === undefined || value === null || isNaN(value)) return;
+            if (value === undefined || value === null) return;
 
             var strategy = "html";
             if (params && params.length && params[0] !== true) strategy = params[0];
@@ -2335,7 +2335,7 @@ var Twig = {
             return s.join(dec);
         },
         trim: function(value, params) {
-            if (value === undefined || value === null || isNaN(value)) return;
+            if (value === undefined || value === null) return;
 
             var str = Twig.filters.escape('' + value), whitespace;
 
@@ -2362,7 +2362,7 @@ var Twig = {
             return whitespace.indexOf(str.charAt(0)) === -1 ? str : '';
         },
         slice: function(value, params) {
-            if (value === undefined || value === null || isNaN(value)) return;
+            if (value === undefined || value === null) return;
             if (params === undefined || params.length < 1) {
                 throw new Twig.Error("slice filter expects at least 1 argument");
             }
@@ -2387,7 +2387,7 @@ var Twig = {
             }
         },
         abs: function(value) {
-            if (value === undefined || value === null || isNaN(value)) return;
+            if (value === undefined || value === null) return;
             return Math.abs(value);
         },
         first: function(value) {
@@ -2421,7 +2421,7 @@ var Twig = {
                 throw new Twig.Error("split filter expects 1 or 2 argument");
             }
 
-            if (value === undefined || value === null || isNaN(value)) return;
+            if (value === undefined || value === null) return;
             var type = Twig._getType(value);
 
             if (type === 'String' || type === 'Number') {
