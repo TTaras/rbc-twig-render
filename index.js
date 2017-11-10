@@ -7,10 +7,13 @@
  */
 
 var Twig = {
-    VERSION: '0.0.10',
+    VERSION: '0.0.12',
+    _getType: function() {
+        return Object.prototype.toString.call(obj).slice(8, -1);
+    },
     _is: function (type, obj) {
-        var clas = Object.prototype.toString.call(obj).slice(8, -1);
-        return obj !== undefined && obj !== null && clas === type;
+        if (type === 'NaN' && isNaN(obj)) return true;
+        return Twig._getType(obj) === type;
     }
 };
 
@@ -2122,16 +2125,22 @@ var Twig = {
             });
         },
         length: function(value) {
-            if (Twig._is("Array", value) || typeof value === "string") {
-                return value.length;
-            } else if (Twig._is("Object", value)) {
-                if (value._keys === undefined) {
-                    return Object.keys(value).length;
-                } else {
-                    return value._keys.length;
-                }
-            } else {
-                return 0;
+            var type = Twig._getType(value);
+
+            switch (type) {
+                case 'Array':
+                case 'String':
+                    return value.length;
+                    break;
+                case 'Object':
+                    if (value._keys === undefined) {
+                        return Object.keys(value).length;
+                    } else {
+                        return value._keys.length;
+                    }
+                    break;
+                default:
+                    return 0;
             }
         },
         reverse: function(value) {
@@ -2146,7 +2155,7 @@ var Twig = {
             }
         },
         keys: function(value) {
-            if (value === undefined || value === null) return;
+            if (value === undefined || value === null || isNaN(value)) return;
 
             var keyset = value._keys || Object.keys(value)
             var output = [];
@@ -2161,15 +2170,15 @@ var Twig = {
             return output;
         },
         url_encode: function(value) {
-            if (value === undefined || value === null) return;
+            if (value === undefined || value === null || isNaN(value)) return;
 
             var result = encodeURIComponent(value);
             result = result.replace("'", "%27");
 
             return result;
         },
-        join: function(value, params) { // !!!!!!!!!!!!!!!!!! remove afret relise 8
-            if (value === undefined || value === null) return;
+        join: function(value, params) {
+            if (value === undefined || value === null || isNaN(value)) return;
 
             var join_str = "",
                 output = [],
@@ -2198,7 +2207,7 @@ var Twig = {
                 throw new Twig.Error("default filter expects one argument");
             }
 
-            if (value === undefined || value === null || value === '') {
+            if (value === undefined || value === null || isNaN(value) || value === '') {
                 if (params === undefined) return '';
                 return params[0];
             } else {
@@ -2212,7 +2221,7 @@ var Twig = {
             return Twig.lib.date(format, date, isUseClientTimezone);
         },
         date_modify: function(value, params) {
-            if (value === undefined || value === null) return;
+            if (value === undefined || value === null || isNaN(value)) return;
 
             if (params === undefined || params.length !== 1) {
                 throw new Twig.Error("date_modify filter expects 1 argument");
@@ -2233,40 +2242,47 @@ var Twig = {
             return new Date(time * 1000);
         },
         replace: function(value, params) {
-            if (value === undefined || value === null) return;
+            if (value === undefined || value === null || isNaN(value)) return;
 
-            var pairs = params[0];
-            var tag;
+            var type = Twig._getType(value);
+            if (type === 'String' || type === 'Number') {
+                var pairs = params[0];
+                var tag;
 
-            for (tag in pairs) {
-                if (pairs.hasOwnProperty(tag) && tag !== "_keys") {
-                    value = Twig.lib.replaceAll(value, tag, pairs[tag]);
+                if (type === 'Number') value = '' + value;
+
+                for (tag in pairs) {
+                    if (pairs.hasOwnProperty(tag) && tag !== "_keys") {
+                        value = Twig.lib.replaceAll(value, tag, pairs[tag]);
+                    }
                 }
-            }
 
-            return value;
+                return value;
+            } else {
+                throw new Twig.Error("replace filter expects value to be a string or number");
+            }
         },
         striptags: function(value) {
-            if (value === undefined || value === null) return;
+            if (value === undefined || value === null || isNaN(value)) return;
             return Twig.lib.strip_tags(value);
         },
         escape: function(value, params) {
-            if (value === undefined || value === null) return;
+            if (value === undefined || value === null || isNaN(value)) return;
 
             var strategy = "html";
             if (params && params.length && params[0] !== true) strategy = params[0];
 
-            if (strategy == "html") {
+            if (strategy === "html") {
                 var raw_value = value.toString().replace(/&/g, "&amp;")
                     .replace(/</g, "&lt;")
                     .replace(/>/g, "&gt;")
                     .replace(/"/g, "&quot;")
                     .replace(/'/g, "&#039;");
                 return Twig.Markup(raw_value, 'html');
-            } else if (strategy == "url") {
+            } else if (strategy === "url") {
                 var result = Twig.filters.url_encode(value);
                 return Twig.Markup(result, 'url');
-            } else if (strategy == "html_attr") {
+            } else if (strategy === "html_attr") {
                 var raw_value = value.toString();
                 var result = "";
 
@@ -2284,7 +2300,7 @@ var Twig = {
                 throw new Twig.Error("escape strategy unsupported");
             }
         },
-        "e": function (value, params) {
+        "e": function(value, params) {
             return Twig.filters.escape(value, params);
         },
         number_format: function(value, params) { // !!!!!!!!!!!  remove afret relise 8
@@ -2313,8 +2329,8 @@ var Twig = {
 
             return s.join(dec);
         },
-        trim: function (value, params) {
-            if (value === undefined || value === null) return;
+        trim: function(value, params) {
+            if (value === undefined || value === null || isNaN(value)) return;
 
             var str = Twig.filters.escape('' + value), whitespace;
 
@@ -2340,8 +2356,8 @@ var Twig = {
 
             return whitespace.indexOf(str.charAt(0)) === -1 ? str : '';
         },
-        slice: function (value, params) {
-            if (value === undefined || value === null) return;
+        slice: function(value, params) {
+            if (value === undefined || value === null || isNaN(value)) return;
             if (params === undefined || params.length < 1) {
                 throw new Twig.Error("slice filter expects at least 1 argument");
             }
@@ -2365,33 +2381,50 @@ var Twig = {
                 throw new Twig.Error("slice filter expects value to be an array or string");
             }
         },
-        abs: function (value) {
-            if (value === undefined || value === null) return;
+        abs: function(value) {
+            if (value === undefined || value === null || isNaN(value)) return;
             return Math.abs(value);
         },
-        first: function (value) {
-            if (Twig._is("Array", value)) {
+        first: function(value) {
+            var type = Twig._getType(value);
+
+            if (type === 'Array') {
                 return value[0];
-            } else if (Twig._is("Object", value)) {
+            } else if (type === 'Object') {
                 var keys = value._keys || Object.keys(value);
                 return value[keys[0]];
-            } else if (typeof value === "string") {
+            } else if (type === "String") {
                 return value.substr(0, 1);
             }
+        },
+        last: function (value) {
+            var type = Twig._getType(value);
 
-            return;
+            switch (type) {
+                case 'Object':
+                    var keys = value._keys || Object.keys(value);
+                    return value[keys[keys.length - 1]];
+                    break;
+                case 'Array':
+                case 'String':
+                    return value[value.length - 1];
+                    break;
+            }
         },
         split: function(value, params) {
-            if (value === undefined || value === null) return;
-
             if (params === undefined || params.length < 1 || params.length > 2) {
                 throw new Twig.Error("split filter expects 1 or 2 argument");
             }
 
-            if (Twig._is("String", value)) {
+            if (value === undefined || value === null || isNaN(value)) return;
+            var type = Twig._getType(value);
+
+            if (type === 'String' || type === 'Number') {
                 var delimiter = params[0],
                     limit = params[1],
                     split = value.split(delimiter);
+
+                if (type === 'Number') value = '' + value;
 
                 if (limit === undefined) {
                     return split;
@@ -2431,17 +2464,8 @@ var Twig = {
                 }
 
             } else {
-                throw new Twig.Error("split filter expects value to be a string");
+                throw new Twig.Error("split filter expects value to be a string or number");
             }
-        },
-        last: function (value) {
-            if (Twig._is('Object', value)) {
-                var keys = value._keys || Object.keys(value);
-                return value[keys[keys.length - 1]];
-            }
-
-            // string|array
-            return value[value.length - 1];
         },
         raw: function (value) {
             return Twig.Markup(value);
@@ -2705,7 +2729,7 @@ var Twig = {
         return src;
     };
     Twig.lib.replaceAll = function (string, search, replace) {
-        return string.split(search).join(replace);
+        return (string && string.split && string.split(search).join(replace)) || '';
     };
     Twig.lib.strtotime = function strtotime(text, now) {
         //   example 1: strtotime('+1 day', 1129633200)
